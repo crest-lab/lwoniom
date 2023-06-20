@@ -43,8 +43,8 @@ module lwoniom_structures
 
     !> system coordinates
     integer  :: nat = 0
-    integer,allocatable  :: at(:)
-    real(wp),allocatable :: xyz(:,:)
+    integer,allocatable  :: at(:)     !> atomic number
+    real(wp),allocatable :: xyz(:,:)  !> also atomic units -> Bohr
     real(wp),allocatable :: grd(:,:,:)
     !> grd should have dimension(3,nat,2)to store two gradients:
     !> one for the layer (high) and one for the parent layer (low)
@@ -75,6 +75,7 @@ contains  !> MODULE PROCEDURES START HERE
 !> ROUTINES GO HERE
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+
 !========================================================================================!
   subroutine structure_data_deallocate(self)
     implicit none
@@ -85,9 +86,11 @@ contains  !> MODULE PROCEDURES START HERE
     self%nat = 0
     if (allocated(self%at)) deallocate (self%at)
     if (allocated(self%xyz)) deallocate (self%xyz)
+    if (allocated(self%grd)) deallocate (self%grd)
     self%nlink = 0
     if (allocated(self%linkat)) deallocate (self%linkat)
     if (allocated(self%linkxyz)) deallocate (self%linkxyz)
+    if (allocated(self%linkgrd)) deallocate (self%linkgrd)
     !self%npoint = 0
     !if (allocated(self%pointc)) deallocate (self%pointc)
     !if (allocated(self%pointxyz)) deallocate (self%pointxyz)

@@ -48,7 +48,7 @@ lwoniom_dep = declare_dependency(
 if get_option('build_exe')
 subdir('testprog')
 lwoniom_exe = executable(
-  meson.project_name(),
+  'lwoniom-tester',
   sources: prog,
   dependencies: lwoniom_dep,
   install: install,
@@ -57,5 +57,3 @@ lwoniom_exe = executable(
 endif
 
 
-# add the testsuite separate meson.build 
-#subdir('testsuite') #has to be filled with tests, not availabel yet

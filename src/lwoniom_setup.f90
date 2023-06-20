@@ -119,7 +119,7 @@ contains  !> MODULE PROCEDURES START HERE
     class(lwoniom_data) :: self
     self%lwoniom_energy = 0.0_Wp
     self%nlayer = 0
-    sel%nfrag = 0
+    self%nfrag = 0
     if (allocated(self%fragment)) deallocate (self%fragment)
   end subroutine lwoniom_data_deallocate
 
