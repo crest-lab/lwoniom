@@ -1,7 +1,7 @@
 !================================================================================!
 ! This file is part of lwoniom.
 !
-! Copyright (C) 2023 Patryk Wesolowski, Philipp Pracht 
+! Copyright (C) 2023 Patryk Wesolowski, Philipp Pracht
 !
 ! lwoniom is free software: you can redistribute it and/or modify it under
 ! the terms of the GNU Lesser General Public License as published by
@@ -17,6 +17,10 @@
 ! along with lwoniom. If not, see <https://www.gnu.org/licenses/>.
 !================================================================================!
 module lwoniom_engrad
+!************************************************************
+!* This module implements the ONIOM energy and
+!* gradient reconstruction.
+!************************************************************
   use iso_fortran_env,only:wp => real64,stdout => output_unit
   use lwoniom_setup
   implicit none
@@ -24,7 +28,6 @@ module lwoniom_engrad
 
 !> routines/datatypes that can be seen outside the module
   public :: lwoniom_singlepoint
-
 
 !========================================================================================!
 !========================================================================================!
@@ -38,7 +41,7 @@ contains  !> MODULE PROCEDURES START HERE
     integer,intent(in)  :: nat        !> number of atoms
     integer,intent(in)  :: at(nat)    !> atom types
     real(wp),intent(in) :: xyz(3,nat) !> Cartesian coordinates in Bohr
-    logical,intent(in),optional    :: verbose  !> printout activation 
+    logical,intent(in),optional    :: verbose  !> printout activation
     type(lwoniom_data),intent(inout) :: dat  !> collection of lwoniom datatypes and settings
     !> OUTPUT
     real(wp),intent(out) :: energy
@@ -49,11 +52,11 @@ contains  !> MODULE PROCEDURES START HERE
     logical :: pr
 
     !> printout activation via verbosity
-    if(present(verbose))then
+    if (present(verbose)) then
       pr = verbose
     else
-      pr =.false. !> (there is close to no printout anyways)
-    endif
+      pr = .false. !> (there is close to no printout anyways)
+    end if
 
     energy = 0.0_wp
     gradient(:,:) = 0.0_wp
@@ -61,7 +64,6 @@ contains  !> MODULE PROCEDURES START HERE
 
     !> singlpoint + gradient call goes here (best would be another module)
     !call lwoniom_eg(  )
-
 
     if (present(iostat)) then
       iostat = io

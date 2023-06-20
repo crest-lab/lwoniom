@@ -1,7 +1,7 @@
 !================================================================================!
 ! This file is part of lwoniom.
 !
-! Copyright (C) 2023 Patryk Wesolowski, Philipp Pracht 
+! Copyright (C) 2023 Patryk Wesolowski, Philipp Pracht
 !
 ! lwoniom is free software: you can redistribute it and/or modify it under
 ! the terms of the GNU Lesser General Public License as published by
@@ -25,7 +25,6 @@ module lwoniom_interface
 
 !> re-exports
   public :: lwoniom_data
-
 
 !========================================================================================!
 !========================================================================================!

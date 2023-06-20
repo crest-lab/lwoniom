@@ -1,7 +1,7 @@
 !================================================================================!
 ! This file is part of lwoniom.
 !
-! Copyright (C) 2023 Patryk Wesolowski, Philipp Pracht 
+! Copyright (C) 2023 Patryk Wesolowski, Philipp Pracht
 !
 ! lwoniom is free software: you can redistribute it and/or modify it under
 ! the terms of the GNU Lesser General Public License as published by
@@ -16,8 +16,14 @@
 ! You should have received a copy of the GNU Lesser General Public License
 ! along with lwoniom. If not, see <https://www.gnu.org/licenses/>.
 !================================================================================!
+
 module lwoniom_setup
+!***************************************************************
+!* This module implements the lwoniom_data type,
+!* the main object used to track fragments and layers
+!**************************************************************
   use iso_fortran_env,only:wp => real64,stdout => output_unit
+  use lwoniom_structures
   implicit none
   private
 
@@ -31,15 +37,17 @@ module lwoniom_setup
   type :: lwoniom_data
 
     real(wp) :: lwoniom_energy
-
-!> variables go here
+    
+    !> number of layers
+    integer :: nlayer = 0   
+ 
+    !> number of fragments
+    integer :: nfrag = 0
+    type(structure_data),allocatable :: fragment(:)
 
   contains
     procedure :: deallocate => lwoniom_data_deallocate
-    procedure :: type_reset => lwoniom_data_reset_types
-    procedure :: type_init => lwoniom_data_make_types
   end type lwoniom_data
-
 
 !========================================================================================!
 !========================================================================================!
@@ -47,39 +55,6 @@ contains  !> MODULE PROCEDURES START HERE
 !========================================================================================!
 !========================================================================================!
 
-  subroutine lwoniom_singlepoint(nat,at,xyz,dat,energy,gradient,verbose,iostat)
-    implicit none
-    !> INPUT
-    integer,intent(in)  :: nat        !> number of atoms
-    integer,intent(in)  :: at(nat)    !> atom types
-    real(wp),intent(in) :: xyz(3,nat) !> Cartesian coordinates in Bohr
-    logical,intent(in),optional    :: verbose  !> printout activation 
-    type(lwoniom_data),intent(inout) :: dat  !> collection of lwoniom datatypes and settings
-    !> OUTPUT
-    real(wp),intent(out) :: energy
-    real(wp),intent(out) :: gradient(3,nat)
-    integer,intent(out),optional  :: iostat
-    !> LOCAL
-    integer :: io
-    logical :: pr
-
-    !> printout activation via verbosity
-    if(present(verbose))then
-      pr = verbose
-    else
-      pr =.false. !> (there is close to no printout anyways)
-    endif
-
-    energy = 0.0_wp
-    gradient(:,:) = 0.0_wp
-    io = 0
-
-
-    if (present(iostat)) then
-      iostat = io
-    end if
-
-  end subroutine lwoniom_singlepoint
 !========================================================================================!
 
   subroutine print_lwoniom_results(iunit,dat)
@@ -111,34 +86,25 @@ contains  !> MODULE PROCEDURES START HERE
     logical :: exitRun
 
 !> mapping of optional instuctions
-    if(present(print))then
+    if (present(print)) then
       pr = print
     else
       pr = .false.
-    endif
-    if(present(verbose))then
+    end if
+    if (present(verbose)) then
       pr2 = verbose
     else
       pr2 = .false.
-    endif
-    if(pr2) pr = pr2    
-    if(present(iunit))then
+    end if
+    if (pr2) pr = pr2
+    if (present(iunit)) then
       myunit = iunit
     else
       myunit = stdout
-    endif
-
-!> Reset datatypes
-    call dat%type_init()
+    end if
 
 
 !> lwONIOM calculator setup goes here
-
-
-
-
-
-
     if ((io /= 0).and.pr) then
       write (myunit,'("Could not create force field calculator ",a)') source
     end if
@@ -152,22 +118,10 @@ contains  !> MODULE PROCEDURES START HERE
     implicit none
     class(lwoniom_data) :: self
     self%lwoniom_energy = 0.0_Wp
-
-    !if (allocated(self%param)) deallocate (self%param)
+    self%nlayer = 0
+    sel%nfrag = 0
+    if (allocated(self%fragment)) deallocate (self%fragment)
   end subroutine lwoniom_data_deallocate
-  subroutine lwoniom_data_reset_types(self)
-    implicit none
-    class(lwoniom_data) :: self
-
-    !if (allocated(self%param)) deallocate (self%param)
-  end subroutine lwoniom_data_reset_types
-  subroutine lwoniom_data_make_types(self)
-    implicit none
-    class(lwoniom_data) :: self
-    call self%type_reset()
-
-    !allocate (self%param)
-  end subroutine lwoniom_data_make_types
 
 !========================================================================================!
 end module lwoniom_setup
