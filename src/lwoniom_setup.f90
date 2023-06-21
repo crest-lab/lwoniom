@@ -190,8 +190,11 @@ contains  !> MODULE PROCEDURES START HERE
     allocate (parent(maxf))
     if (maxf .eq. maxval(layer_tmp,1)) then
       call construct_tree_ONIOM_classic(maxf,parent)
-    else
+    else if(present(bond))then
       call construct_tree_ONIOM_multicenter(nat,layer_tmp,indexf,bond,maxf,parent)
+    else
+      write (stderr,'(a)') "**ERROR** 'bond' array not provided in call to "//source
+      error stop
     end if
 
     !> go through all the fragments, create structure_data and put 
