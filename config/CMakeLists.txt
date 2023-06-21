@@ -36,7 +36,7 @@ check_minimal_compiler_version("Fortran" "${fortran_minimal_versions}")
 
 option(WITH_OpenMP "Enable support for shared memory parallelisation with OpenMP" TRUE)
 
-option(BUILD_EXE "Build a test binary?" FALSE)
+option(build_exe "Build a test binary?" FALSE)
 
 
 if(NOT DEFINED "${PROJECT_NAME}-dependency-method")

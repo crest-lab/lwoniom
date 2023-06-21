@@ -105,7 +105,7 @@ target_link_libraries(
 #
 # Executables
 #
-#IF(BUILD_EXE)
+IF(build_exe)
 set(srcs2)
 add_subdirectory("testprog")
 add_executable(
@@ -124,7 +124,7 @@ target_link_libraries(
   PRIVATE
   "lib${PROJECT_NAME}.a"
 )
-#ENDIF()
+ENDIF()
 
 #
 # Export targets for other projects

@@ -25,6 +25,7 @@ module lwoniom_structures
   implicit none
   private
 
+!**************************************************************************!
 !> a single structure_data required for a lwONIOM calculation
 !> tracking information will be stored in an undirected tree
   public :: structure_data
@@ -43,6 +44,7 @@ module lwoniom_structures
 
     !> system coordinates
     integer  :: nat = 0
+    integer,allocatable  :: opos(:)   !> mapping of each atom in the original (topmost) layer
     integer,allocatable  :: at(:)     !> atomic number
     real(wp),allocatable :: xyz(:,:)  !> also atomic units -> Bohr
     real(wp),allocatable :: grd(:,:,:)
@@ -55,7 +57,7 @@ module lwoniom_structures
     real(wp),allocatable :: linkxyz(:,:)
     real(wp),allocatable :: linkgrd(:,:,:) !> similar to grd, but for link atoms
 
-    !> embedding information (TODO)
+    !> embedding information (TODO, for the future)
     !integer :: npoint
     !real(wp),allocatable :: pointc(:)
     !real(wp),allocatable :: pointxyz(:,:)
@@ -64,6 +66,7 @@ module lwoniom_structures
     procedure :: deallocate => structure_data_deallocate
     procedure :: add_child => structure_add_child
   end type structure_data
+!**************************************************************************!
 
 !========================================================================================!
 !========================================================================================!
@@ -75,9 +78,19 @@ contains  !> MODULE PROCEDURES START HERE
 !> ROUTINES GO HERE
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+! TODO: we need a routine that takes a structure_data object
+!       and returns  the variables nat, at, xyz for a newly build
+!       structure consisting out of the fragments atoms+link atoms
+
+! TODO: a second routine should recieve energy and gradients and distribute it
+!       into grd and linkgrd accordingly
+
 
 !========================================================================================!
   subroutine structure_data_deallocate(self)
+!**************************************************
+!* Deallocates a given structure_data object
+!**************************************************
     implicit none
     class(structure_data) :: self
     self%layer = 0
@@ -95,8 +108,12 @@ contains  !> MODULE PROCEDURES START HERE
     !if (allocated(self%pointc)) deallocate (self%pointc)
     !if (allocated(self%pointxyz)) deallocate (self%pointxyz)
   end subroutine structure_data_deallocate
+
 !========================================================================================!
   subroutine structure_add_child(self,child)
+!********************************************************
+!* links two structure_data objects as parent and child
+!*******************************************************
     implicit none
     class(structure_data) :: self
     type(structure_data)  :: child

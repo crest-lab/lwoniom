@@ -35,12 +35,12 @@ contains  !> MODULE PROCEDURES START HERE
 !========================================================================================!
 !========================================================================================!
 
-  subroutine lwoniom_singlepoint(nat,at,xyz,dat,energy,gradient,verbose,iostat)
+  subroutine lwoniom_singlepoint(nat,dat,energy,gradient,verbose,iostat)
     implicit none
     !> INPUT
     integer,intent(in)  :: nat        !> number of atoms
-    integer,intent(in)  :: at(nat)    !> atom types
-    real(wp),intent(in) :: xyz(3,nat) !> Cartesian coordinates in Bohr
+    !integer,intent(in)  :: at(nat)    !> atom types
+    !real(wp),intent(in) :: xyz(3,nat) !> Cartesian coordinates in Bohr
     logical,intent(in),optional    :: verbose  !> printout activation
     type(lwoniom_data),intent(inout) :: dat  !> collection of lwoniom datatypes and settings
     !> OUTPUT
@@ -62,8 +62,11 @@ contains  !> MODULE PROCEDURES START HERE
     gradient(:,:) = 0.0_wp
     io = 0
 
-    !> singlpoint + gradient call goes here (best would be another module)
-    !call lwoniom_eg(  )
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! TODO do the ONIOM energy and gradient reconstruction here
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
     if (present(iostat)) then
       iostat = io

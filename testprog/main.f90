@@ -38,6 +38,7 @@ program lwoniom_main_tester
   logical :: fail,pr
   integer :: io
   type(lwoniom_data) :: dat
+  integer,allocatable :: layer(:)
 
 !========================================================================================!
   fail = .false.
@@ -71,6 +72,12 @@ program lwoniom_main_tester
   write (*,*) '============================================================'
   write (*,*) '==================== lwONIOM SETUP ========================='
   write (*,*) '============================================================'
+  write (*,*)
+    
+    allocate(layer(nat))
+    layer = at
+    call lwoniom_initialize(nat,at,xyz,dat,layer)
+    call dat%info()
 
   write (*,*)
   write (*,*) '========================== END ============================='
