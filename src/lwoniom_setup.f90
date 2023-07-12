@@ -213,12 +213,15 @@ contains  !> MODULE PROCEDURES START HERE
     enddo
 
     !> at this point, dat%fragment should be set up
-    !> what's missing are the linking atoms between the layers
-    ! TODO
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!  TO HERE
+!  linking atoms between layers
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+!> at this point, dat%fragment should be set up
+!> what's missing are the linking atoms between the layers
+! Determine the linking atoms between layers
+call determine_linking_atoms(dat)
 
     if ((io /= 0).and.pr) then
       write (myunit,'("Could not create lwONIOM object ",a)') source
@@ -231,11 +234,58 @@ contains  !> MODULE PROCEDURES START HERE
     if (allocated(indexf)) deallocate (indexf)
   end subroutine lwoniom_initialize
 
+subroutine determine_linking_atoms(self)
+    implicit none
+    class(lwoniom_data) :: self
+    integer :: i, j, k, l
+    integer, allocatable :: linking_atoms(:)
+
+    allocate(linking_atoms(self%nlayer))
+
+    do i = 1, self%nlayer
+      linking_atoms(i) = 0
+    end do
+
+    do i = 1, self%nlayer
+      do j = 1, self%nfrag
+        if (self%fragment(j)%layer == i) then
+          do k = 1, self%nfrag
+            if (self%fragment(k)%layer == i + 1) then
+              do l = 1, self%fragment(k)%nat
+                if (any(self%fragment(j)%at == self%fragment(k)%at(l))) then
+                  linking_atoms(i) = self%fragment(j)%at(1)
+                  exit
+                endif
+              enddo
+            endif
+          enddo
+          exit
+        endif
+      enddo
+    enddo
+
+    write(*, *) "Linking atoms between layers:"
+    do i = 1, self%nlayer
+      write(*, *) "Layer", i, ": Atom", linking_atoms(i)
+    enddo
+
+    deallocate(linking_atoms)
+  end subroutine determine_linking_atoms
 !========================================================================================!
 
   subroutine lwoniom_data_deallocate(self)
 !****************************************************
-!* This subroutine deallocates a lwoniom_data object
+!* Th  if ((io /= 0).and.pr) then
+      write (myunit,'("Could not create lwONIOM object ",a)') source
+    end if
+    if (present(iostat)) then
+      iostat = io
+    end if
+
+    if (allocated(subsystem_tmp)) deallocate (subsystem_tmp)
+    if (allocated(indexf)) deallocate (indexf)
+  end subroutine lwoniom_initialize
+subroutine deallocates a lwoniom_data object
 !*****************************************************
     implicit none
     class(lwoniom_data) :: self
