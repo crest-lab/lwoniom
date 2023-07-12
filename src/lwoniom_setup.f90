@@ -83,23 +83,23 @@ contains  !> MODULE PROCEDURES START HERE
     write (myunit,outfmt2) 'Layers        :',self%nlayer,''
     write (myunit,outfmt2) 'Substructures :',self%nfrag,''
 
-    if(allocated(self%fragment))then
-      write(myunit,*)
-      do i=1,self%nlayer
-        write(myunit,'(2x,a,i0)') 'Layer ',i
+    if (allocated(self%fragment)) then
+      write (myunit,*)
+      do i = 1,self%nlayer
+        write (myunit,'(2x,a,i0)') 'Layer ',i
         do j = 1,self%nfrag
-        if(self%fragment(j)%layer == i)then
-        write(myunit,'(4x,a,i0)',advance='no') '-> fragment ',self%fragment(j)%id
-        if(self%fragment(j)%parent .ne. 0)then
-        write(myunit,'(1x,a,i0)') ', substructure of fragment ',self%fragment(j)%parent
-        else
-        write(myunit,*)
-        endif
-        flush(myunit)
-        endif 
-        enddo
-      enddo
-    endif
+          if (self%fragment(j)%layer == i) then
+            write (myunit,'(4x,a,i0)',advance='no') '-> fragment ',self%fragment(j)%id
+            if (self%fragment(j)%parent .ne. 0) then
+              write (myunit,'(1x,a,i0)') ', substructure of fragment ',self%fragment(j)%parent
+            else
+              write (myunit,*)
+            end if
+            flush (myunit)
+          end if
+        end do
+      end do
+    end if
   end subroutine print_lwoniom_info
 
 !========================================================================================!
@@ -185,34 +185,32 @@ contains  !> MODULE PROCEDURES START HERE
     !> and the mapping which atom belongs to which node
     call count_fragments(nat,layer_tmp,subsystem_tmp,maxf,indexf)
     dat%nlayer = maxval(layer_tmp,1)
-    
+
     !> from the connectivity determine the tree structure
     allocate (parent(maxf))
     if (maxf .eq. maxval(layer_tmp,1)) then
       call construct_tree_ONIOM_classic(maxf,parent)
-    else if(present(bond))then
+    else if (present(bond)) then
       call construct_tree_ONIOM_multicenter(nat,layer_tmp,indexf,bond,maxf,parent)
     else
       write (stderr,'(a)') "**ERROR** 'bond' array not provided in call to "//source
       error stop
     end if
 
-    !> go through all the fragments, create structure_data and put 
+    !> go through all the fragments, create structure_data and put
     !> them into the fragment list
-    do i=1,maxf
+    do i = 1,maxf
       call tmp%deallocate()
       call fragment_set_atoms_ONIOM(nat,at,xyz,layer_tmp,maxf,indexf,parent,i,tmp)
       call dat%add_fragment(tmp)
-    enddo
+    end do
     !> and connect them in the parent-child relations
-    do i=1,maxf
-      if(parent(i) .ne. 0)then
-        j = parent(i) 
-        call dat%fragment(j)%add_child( dat%fragment(i) ) 
-      endif
-    enddo
-
-    !> at this point, dat%fragment should be set up
+    do i = 1,maxf
+      if (parent(i) .ne. 0) then
+        j = parent(i)
+        call dat%fragment(j)%add_child(dat%fragment(i))
+      end if
+    end do
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !  linking atoms between layers
@@ -221,7 +219,7 @@ contains  !> MODULE PROCEDURES START HERE
 !> at this point, dat%fragment should be set up
 !> what's missing are the linking atoms between the layers
 ! Determine the linking atoms between layers
-call determine_linking_atoms(dat)
+    call determine_linking_atoms(dat)
 
     if ((io /= 0).and.pr) then
       write (myunit,'("Could not create lwONIOM object ",a)') source
@@ -234,58 +232,48 @@ call determine_linking_atoms(dat)
     if (allocated(indexf)) deallocate (indexf)
   end subroutine lwoniom_initialize
 
-subroutine determine_linking_atoms(self)
+  subroutine determine_linking_atoms(self)
     implicit none
     class(lwoniom_data) :: self
-    integer :: i, j, k, l
-    integer, allocatable :: linking_atoms(:)
+    integer :: i,j,k,l
+    integer,allocatable :: linking_atoms(:)
 
-    allocate(linking_atoms(self%nlayer))
+    allocate (linking_atoms(self%nlayer))
 
-    do i = 1, self%nlayer
+    do i = 1,self%nlayer
       linking_atoms(i) = 0
     end do
 
-    do i = 1, self%nlayer
-      do j = 1, self%nfrag
+    do i = 1,self%nlayer
+      do j = 1,self%nfrag
         if (self%fragment(j)%layer == i) then
-          do k = 1, self%nfrag
-            if (self%fragment(k)%layer == i + 1) then
-              do l = 1, self%fragment(k)%nat
+          do k = 1,self%nfrag
+            if (self%fragment(k)%layer == i+1) then
+              do l = 1,self%fragment(k)%nat
                 if (any(self%fragment(j)%at == self%fragment(k)%at(l))) then
                   linking_atoms(i) = self%fragment(j)%at(1)
                   exit
-                endif
-              enddo
-            endif
-          enddo
+                end if
+              end do
+            end if
+          end do
           exit
-        endif
-      enddo
-    enddo
+        end if
+      end do
+    end do
 
-    write(*, *) "Linking atoms between layers:"
-    do i = 1, self%nlayer
-      write(*, *) "Layer", i, ": Atom", linking_atoms(i)
-    enddo
+    write (*,*) "Linking atoms between layers:"
+    do i = 1,self%nlayer
+      write (*,*) "Layer",i,": Atom",linking_atoms(i)
+    end do
 
-    deallocate(linking_atoms)
+    deallocate (linking_atoms)
   end subroutine determine_linking_atoms
 !========================================================================================!
 
   subroutine lwoniom_data_deallocate(self)
 !****************************************************
-!* Th  if ((io /= 0).and.pr) then
-      write (myunit,'("Could not create lwONIOM object ",a)') source
-    end if
-    if (present(iostat)) then
-      iostat = io
-    end if
-
-    if (allocated(subsystem_tmp)) deallocate (subsystem_tmp)
-    if (allocated(indexf)) deallocate (indexf)
-  end subroutine lwoniom_initialize
-subroutine deallocates a lwoniom_data object
+!* This subroutine deallocates a lwoniom_data object
 !*****************************************************
     implicit none
     class(lwoniom_data) :: self
@@ -451,15 +439,14 @@ subroutine deallocates a lwoniom_data object
 
   end subroutine construct_tree_ONIOM_multicenter
 
-
 !========================================================================================!
   subroutine fragment_set_atoms_ONIOM(nat,at,xyz,layer,maxf,indexf,parent,k,frag)
 !**************************************************************************
 !* This subroutine creates a structure_data object frag for the
 !* k-th fragment index in an ONIOM setup, based on the present information
 !***************************************************************************
-    implicit none    
-    character(len=*),parameter :: source='fragment_set_atoms'
+    implicit none
+    character(len=*),parameter :: source = 'fragment_set_atoms'
     integer,intent(in) :: nat
     integer,intent(in) :: at(nat)
     real(wp),intent(in) :: xyz(3,nat)
@@ -470,25 +457,24 @@ subroutine deallocates a lwoniom_data object
     integer,intent(in) :: k
     type(structure_data),intent(out) :: frag
     logical,allocatable :: taken(:)
-    integer :: i, natf,n,layerk
-    
+    integer :: i,natf,n,layerk
 
     call frag%deallocate()
-    allocate(taken(nat), source=.false.)
+    allocate (taken(nat),source=.false.)
     taken(:) = .false.
- 
-    if(k > maxf .or. k < 1)then
-      write(stderr,'(a,a)') "**ERROR** invalid fragment index in ",source
+
+    if (k > maxf.or.k < 1) then
+      write (stderr,'(a,a)') "**ERROR** invalid fragment index in ",source
       error stop
-    endif
+    end if
 
     !> add all atoms that belong to k anyways
-    do i=1,nat
-      if(indexf(i) == k)then
+    do i = 1,nat
+      if (indexf(i) == k) then
         taken(i) = .true.
         layerk = layer(i)
-      endif 
-    enddo
+      end if
+    end do
     !> and then go through tree recursively
     call recursive_take(nat,maxf,parent,indexf,k,taken)
 
@@ -498,44 +484,43 @@ subroutine deallocates a lwoniom_data object
     frag%id = k
     frag%layer = layerk
     frag%nat = natf
-    allocate(frag%opos(natf), source=0)
-    allocate(frag%at(natf),source = 0)
-    allocate(frag%xyz(3,natf), source=0.0_wp)
-    allocate(frag%grd(3,natf,2), source=0.0_wp)
-    n = 0 
-    do i=1,nat
-       if(taken(i))then
-         n = n + 1
-         frag%opos(n) = i 
-         frag%at(n) = at(i)
-         frag%xyz(1:3,n) = xyz(1:3,i)
-       endif
-    enddo    
+    allocate (frag%opos(natf),source=0)
+    allocate (frag%at(natf),source=0)
+    allocate (frag%xyz(3,natf),source=0.0_wp)
+    allocate (frag%grd(3,natf,2),source=0.0_wp)
+    n = 0
+    do i = 1,nat
+      if (taken(i)) then
+        n = n+1
+        frag%opos(n) = i
+        frag%at(n) = at(i)
+        frag%xyz(1:3,n) = xyz(1:3,i)
+      end if
+    end do
 
-    deallocate(taken)
+    deallocate (taken)
   contains
     recursive subroutine recursive_take(nat,maxf,parent,indexf,k,taken)
-       implicit none
-       integer,intent(in) :: k
-       integer,intent(in) :: nat
-       integer,intent(in) :: maxf
-       integer,intent(in) :: indexf(nat)
-       integer,intent(in) :: parent(maxf)
-       logical,intent(inout) :: taken(nat)
-       integer :: i,j 
-       do i=1,maxf
-        if(parent(i).eq.k)then
-          do j=1,nat
-            if(indexf(j) == i)then
+      implicit none
+      integer,intent(in) :: k
+      integer,intent(in) :: nat
+      integer,intent(in) :: maxf
+      integer,intent(in) :: indexf(nat)
+      integer,intent(in) :: parent(maxf)
+      logical,intent(inout) :: taken(nat)
+      integer :: i,j
+      do i = 1,maxf
+        if (parent(i) .eq. k) then
+          do j = 1,nat
+            if (indexf(j) == i) then
               taken(j) = .true.
-            endif
-          enddo
+            end if
+          end do
           call recursive_take(nat,maxf,parent,indexf,i,taken)
-         endif 
-       enddo
+        end if
+      end do
     end subroutine recursive_take
   end subroutine fragment_set_atoms_ONIOM
-
 
 !========================================================================================!
   subroutine fragment_set_atoms_QMMM(nat,at,xyz,layer,maxf,indexf,parent,k,frag)
@@ -543,8 +528,8 @@ subroutine deallocates a lwoniom_data object
 !* This subroutine creates a structure_data object frag for the
 !* k-th fragment index in an QMMM setup, based on the present information
 !***************************************************************************
-    implicit none    
-    character(len=*),parameter :: source='fragment_set_atoms_QMMM'
+    implicit none
+    character(len=*),parameter :: source = 'fragment_set_atoms_QMMM'
     integer,intent(in) :: nat
     integer,intent(in) :: at(nat)
     real(wp),intent(in) :: xyz(3,nat)
@@ -555,25 +540,24 @@ subroutine deallocates a lwoniom_data object
     integer,intent(in) :: k
     type(structure_data),intent(out) :: frag
     logical,allocatable :: taken(:)
-    integer :: i, natf,n,layerk
-    
+    integer :: i,natf,n,layerk
 
     call frag%deallocate()
-    allocate(taken(nat), source=.false.)
+    allocate (taken(nat),source=.false.)
     taken(:) = .false.
- 
-    if(k > maxf .or. k < 1)then
-      write(stderr,'(a,a)') "**ERROR** invalid fragment index in ",source
-      error stop
-    endif
 
-    !> add all atoms that belong to k 
-    do i=1,nat
-      if(indexf(i) == k)then
+    if (k > maxf.or.k < 1) then
+      write (stderr,'(a,a)') "**ERROR** invalid fragment index in ",source
+      error stop
+    end if
+
+    !> add all atoms that belong to k
+    do i = 1,nat
+      if (indexf(i) == k) then
         taken(i) = .true.
         layerk = layer(i)
-      endif 
-    enddo
+      end if
+    end do
 
     !> determine how many atoms there are in the fragment total
     natf = count(taken(:),1)
@@ -581,21 +565,21 @@ subroutine deallocates a lwoniom_data object
     frag%id = k
     frag%layer = layerk
     frag%nat = natf
-    allocate(frag%opos(natf), source=0)
-    allocate(frag%at(natf),source = 0)
-    allocate(frag%xyz(3,natf), source=0.0_wp)
-    allocate(frag%grd(3,natf,2), source=0.0_wp)
-    n = 0 
-    do i=1,nat
-       if(taken(i))then
-         n = n + 1
-         frag%opos(n) = i 
-         frag%at(n) = at(i)
-         frag%xyz(1:3,n) = xyz(1:3,i)
-       endif
-    enddo    
+    allocate (frag%opos(natf),source=0)
+    allocate (frag%at(natf),source=0)
+    allocate (frag%xyz(3,natf),source=0.0_wp)
+    allocate (frag%grd(3,natf,2),source=0.0_wp)
+    n = 0
+    do i = 1,nat
+      if (taken(i)) then
+        n = n+1
+        frag%opos(n) = i
+        frag%at(n) = at(i)
+        frag%xyz(1:3,n) = xyz(1:3,i)
+      end if
+    end do
 
-    deallocate(taken)
+    deallocate (taken)
   end subroutine fragment_set_atoms_QMMM
 
 !========================================================================================!

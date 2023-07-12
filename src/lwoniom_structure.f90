@@ -85,7 +85,6 @@ contains  !> MODULE PROCEDURES START HERE
 ! TODO: a second routine should recieve energy and gradients and distribute it
 !       into grd and linkgrd accordingly
 
-
 !========================================================================================!
   subroutine structure_data_deallocate(self)
 !**************************************************

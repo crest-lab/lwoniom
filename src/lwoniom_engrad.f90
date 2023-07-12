@@ -62,11 +62,9 @@ contains  !> MODULE PROCEDURES START HERE
     gradient(:,:) = 0.0_wp
     io = 0
 
-
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! TODO do the ONIOM energy and gradient reconstruction here
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
     if (present(iostat)) then
       iostat = io
