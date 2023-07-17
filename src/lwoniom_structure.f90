@@ -46,15 +46,17 @@ module lwoniom_structures
     integer  :: nat = 0
     integer,allocatable  :: opos(:)   !> mapping of each atom in the original (topmost) layer
     integer,allocatable  :: at(:)     !> atomic number
-    real(wp),allocatable :: xyz(:,:)  !> also atomic units -> Bohr
+    real(wp),allocatable :: xyz(:,:)  !> Cartesian coordinates, also atomic units -> Bohr
     real(wp),allocatable :: grd(:,:,:)
     !> grd should have dimension(3,nat,2)to store two gradients:
     !> one for the layer (high) and one for the parent layer (low)
 
     !> link atom coordinates
     integer :: nlink = 0
-    integer,allocatable :: linkat(:)
-    real(wp),allocatable :: linkxyz(:,:)
+    integer,allocatable :: linkopos(:)  !> corresponds to which atom in original structure?
+    integer,allocatable :: linksto(:)   !> links to which atom in this fragment?
+    integer,allocatable :: linkat(:)    !> atom type (will be mostly H)
+    real(wp),allocatable :: linkxyz(:,:)  !> Cartesian coordinates, in Bohr
     real(wp),allocatable :: linkgrd(:,:,:) !> similar to grd, but for link atoms
 
     !> embedding information (TODO, for the future)
@@ -65,6 +67,7 @@ module lwoniom_structures
   contains
     procedure :: deallocate => structure_data_deallocate
     procedure :: add_child => structure_add_child
+    procedure :: write => structure_data_write_structure
   end type structure_data
 !**************************************************************************!
 
@@ -82,8 +85,33 @@ contains  !> MODULE PROCEDURES START HERE
 !       and returns  the variables nat, at, xyz for a newly build
 !       structure consisting out of the fragments atoms+link atoms
 
+!> Extracts the atoms and link atoms of the structure_data object into a new
+!structure
+  subroutine extract_atoms_and_links(self, nat_new, at_new, xyz_new)
+    implicit none
+    class(structure_data) :: self
+    integer, intent(out) :: nat_new    !> Number of atoms in the new structure
+    integer, dimension(:), intent(out) :: at_new   !> Atomic numbers of atoms in the new structure
+    real(wp), dimension(:,:), intent(out) :: xyz_new !> Cartesian coordinates of atoms in the new structure
+
+    !> Combine the original atoms and link atoms
+    nat_new = self%nat + self%nlink
+    at_new = [self%at, self%linkat]
+    xyz_new = reshape([self%xyz, self%linkxyz], [nat_new, 3])
+
+  end subroutine extract_atoms_and_links
+
+  subroutine structure_data_write_structure(self)
+    implicit none
+    class(structure_data) :: self
+
+  !>   fragment(i)%write()
+
+  end subroutine structure_data_write_structure
+
+
 ! TODO: a second routine should recieve energy and gradients and distribute it
-!       into grd and linkgrd accordingly
+!       into grd and linkgrd accordingly Eq.6+8
 
 !========================================================================================!
   subroutine structure_data_deallocate(self)

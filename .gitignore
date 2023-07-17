@@ -1,9 +1,1 @@
-*.o
-*.mod
-*.a
-*.tgz
-github_bin/
-build_majestix
-build_commands
-_build*
-bin/
+build
