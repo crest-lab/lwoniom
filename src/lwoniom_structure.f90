@@ -97,7 +97,7 @@ contains  !> MODULE PROCEDURES START HERE
     !> Combine the original atoms and link atoms
     nat_new = self%nat + self%nlink
     at_new = [self%at, self%linkat]
-    xyz_new = reshape([self%xyz, self%linkxyz], [nat_new, 3])
+    xyz_new = reshape([self%xyz, self%linkxyz], [3,nat_new])
 
   end subroutine extract_atoms_and_links
 
