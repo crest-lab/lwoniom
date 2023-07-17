@@ -68,6 +68,7 @@ module lwoniom_structures
     procedure :: deallocate => structure_data_deallocate
     procedure :: add_child => structure_add_child
     procedure :: write => structure_data_write_structure
+    procedure :: extract => extract_atoms_and_links
   end type structure_data
 !**************************************************************************!
 
