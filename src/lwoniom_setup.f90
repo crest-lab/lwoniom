@@ -247,7 +247,9 @@ contains  !> MODULE PROCEDURES START HERE
     implicit none
     type(lwoniom_data) :: self
     integer,intent(in) :: bond_tmp(:,:)
-    integer :: i,j,k,l
+    integer :: i,j,k,l,m,nat,nat_fragment
+
+    integer, allocatable :: linking_atoms(:)   
 
     !TODO : somehow the code we had here was overwritten
     !The are several loops:
@@ -255,7 +257,27 @@ contains  !> MODULE PROCEDURES START HERE
     ! 2. loop over all atoms in the fragment
     ! 3. check all bonds of the atom
     ! 4. if the bond is to an atom that is NOT part of the same fragment, create link atom
-
+   
+   nat = size(bond_tmp,1)
+   allocate (linking_atoms(nat))
+    
+    do i=1,self%nfrag
+      nat_fragment = self%fragment(i)%nat
+       m=0
+       linking_atoms=0
+         do j=1,nat_fragment
+         l=self%fragment(i)%opos(j)
+            do k=1,nat
+               if ( bond_tmp(l,k) .ne. 0 ) then
+                  if( .not. any(self%fragment(i)%opos(:) .eq. k)) then
+                    m=m+1
+                    linking_atoms(m) = k
+                  endif 
+               endif
+            enddo
+         enddo
+     enddo
+   
 
   end subroutine determine_linking_atoms
 !========================================================================================!
