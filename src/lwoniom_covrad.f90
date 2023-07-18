@@ -120,6 +120,15 @@ contains !> MODULE PROCEDURES START HERE
      integer,intent(in) :: at_a, at_b, at_l  !> atomic number of atoms a,b, and l
      real(wp) :: g
 
+  ! Obtain the covalent radii of atoms a, b, and l
+    real(wp) :: rcov_a, rcov_b, rcov_l
+    rcov_a = covalent_radius(at_a)
+    rcov_b = covalent_radius(at_b)
+    rcov_l = covalent_radius(at_l)
+
+    ! Calculate the ratio from the covalent radii of the atoms
+    g = (rcov_b + rcov_l) / (rcov_a + rcov_b)
+
   !TODO calculate the ratio from the covalent radii of the atoms
 
   end function link_ratio_g 
