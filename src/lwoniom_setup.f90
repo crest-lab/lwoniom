@@ -24,6 +24,7 @@ module lwoniom_setup
 !**************************************************************
   use iso_fortran_env,only:wp => real64,stdout => output_unit,stderr => error_unit
   use lwoniom_structures
+  use lwoniom_covrad
   implicit none
   private
 
@@ -138,7 +139,7 @@ contains  !> MODULE PROCEDURES START HERE
     type(structure_data) :: tmp
     integer,allocatable :: subsystem_tmp(:)
     integer,allocatable :: layer_tmp(:)
-    integer,allocatable :: bond_tmp(:)
+    integer,allocatable :: bond_tmp(:,:)
     integer :: ich,io,myunit
     logical :: ex,okbas,pr,pr2
     logical :: exitRun
@@ -218,10 +219,7 @@ contains  !> MODULE PROCEDURES START HERE
        !> if bond was provided, use those
        bond_tmp = bond
     else
-       !TODO 
-       !> else, determine "mock-up" bonding information
-       ! maybe from covalent radii, see lwoniom_covrad.f90
-       ! call lwoniom_dummy_bonds(nat,at,xyz,1.1_wp,bond_tmp) 
+        call lwoniom_rcov_bonds(nat,at,xyz,1.1_wp,bond_tmp) 
     endif
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

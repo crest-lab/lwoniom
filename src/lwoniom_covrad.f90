@@ -59,6 +59,9 @@ module lwoniom_covrad
   &                 1.21_wp,1.16_wp,1.15_wp,1.09_wp,1.22_wp,            & ! -Cn
   &                    1.36_wp,1.43_wp,1.46_wp,1.58_wp,1.48_wp,1.57_wp ] ! Nh-Og
 !&>
+    
+
+  public :: lwoniom_rcov_bonds
 
 !========================================================================================!
 !========================================================================================!
@@ -88,8 +91,28 @@ module lwoniom_covrad
  !TODO loop over all atom pairs (a,b), calculate their distance
  !and check against the sum of their covalent radii * factor
 
- end subroutine lwoniom_rcov_bonds
 
+ ! Loop over all atom pairs (a, b), calculate their distance, and check against
+ ! the sum of their covalent radii * factor
+  do i = 1, nat
+    do j = i + 1, nat
+      ! Calculate the distance between atoms 'i' and 'j'
+      rab = sqrt(sum((xyz(:, i) - xyz(:, j))**2)) ! Loop over all atom pairs (a,b), calculate their distance, and check against the sum of their covalent radii* factor
+
+      ! Determine the sum of covalent radii for atoms 'i' and 'j'
+      rcovsum = covalent_radius(at(i)) + covalent_radius(at(j))
+
+      ! Check if the distance is smaller than the sum of covalent radii times
+      ! 'factor'
+      if ( rab <= rcovsum * factor ) then
+        bond_tmp(i, j) = 1  ! Set a bond between atoms 'i' and 'j'
+        bond_tmp(j, i) = 1  ! (assuming bond connectivity is symmetric)
+       ! write (*,*) i,j,1   
+      end if
+    end do
+  end do
+
+ end subroutine lwoniom_rcov_bonds
 
 !========================================================================================!
 !========================================================================================!
