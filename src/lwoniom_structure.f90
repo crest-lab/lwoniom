@@ -68,6 +68,7 @@ module lwoniom_structures
     procedure :: deallocate => structure_data_deallocate
     procedure :: add_child => structure_add_child
     procedure :: extract => extract_atoms_and_links
+    procedure :: gradient_distribution
   end type structure_data
 !**************************************************************************!
 
@@ -100,15 +101,25 @@ contains  !> MODULE PROCEDURES START HERE
 !========================================================================================!
 
 ! TODO: take gradient of dimension (3,nat_new) and distribute to grd and linkgrd
-  
+   
+  subroutine gradient_distribution(self,grd)  
+    implicit none
+    class(structure_data) :: self
+    real(wp),dimension(:,:), intent(in) :: grd
+    integer :: nat_new
 
+    nat_new = size(grd,2)
+  
+ !> Distribute the gradient to grd and linkgrd
+    self%grd = grd(:, 1:self%nat)
+    self%linkgrd = grd(:, self%nat + 1:nat_new)
+
+  end subroutine gradient_distribution
 
 ! TODO: a second routine should recieve energy and gradients and distribute it
 !       into grd and linkgrd accordingly Eq.6+8 -> Jacobian
 
   
-
-
 !========================================================================================!
   subroutine structure_data_deallocate(self)
 !**************************************************
