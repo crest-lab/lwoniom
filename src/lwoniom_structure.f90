@@ -41,8 +41,9 @@ module lwoniom_structures
     !> energies for level of theory at current layer (high) and parent layer (low)
     real(wp) :: energy_high = 0.0_wp
     real(wp) :: energy_low = 0.0_wp
+    integer :: truenat
     real(wp),allocatable :: gradient(:,:) !> gradient in the original system's dimension
-                                          !> projected via Jacobian
+    !> projected via Jacobian
 
     !> system coordinates
     integer  :: nat = 0
@@ -53,11 +54,12 @@ module lwoniom_structures
 
     !> link atom coordinates
     integer :: nlink = 0
-    integer,allocatable :: linkopos(:)  !> corresponds to which atom in original structure?
-    integer,allocatable :: linksto(:)   !> links to which atom in this fragment?
-    integer,allocatable :: linkat(:)    !> atom type (will be mostly H)
+    integer,allocatable :: linkopos(:)    !> corresponds to which atom in original structure?
+    integer,allocatable :: linksto(:)     !> links to which atom in this fragment?
+    real(wp),allocatable :: link_g(:)     !> link model scaling parameter g
+    integer,allocatable :: linkat(:)      !> atom type (will be mostly H)
     real(wp),allocatable :: linkxyz(:,:)  !> Cartesian coordinates, in Bohr
-    real(wp),allocatable :: linkgrd(:,:) !> similar to grd, but for link atoms
+    real(wp),allocatable :: linkgrd(:,:)  !> similar to grd, but for link atoms
 
     !> embedding information (TODO, for the future)
     !integer :: npoint
@@ -78,48 +80,109 @@ contains  !> MODULE PROCEDURES START HERE
 !========================================================================================!
 !========================================================================================!
 
-  subroutine extract_atoms_and_links(self, nat_new, at_new, xyz_new)
+  subroutine extract_atoms_and_links(self,nat_new,at_new,xyz_new)
 !*****************************************************************
 !* Extracts the atoms and link atoms of the structure_data object
 !* into a new structure.
 !*****************************************************************
     implicit none
     class(structure_data) :: self
-    integer, intent(out) :: nat_new    !> Number of atoms in the new structure
-    integer,allocatable, dimension(:), intent(out) :: at_new   !> Atomic numbers of atoms in the new structure
-    real(wp),allocatable, dimension(:,:), intent(out) :: xyz_new !> Cartesian coordinates of atoms in the new structure
+    integer,intent(out) :: nat_new    !> Number of atoms in the new structure
+    integer,allocatable,dimension(:),intent(out) :: at_new   !> Atomic numbers of atoms in the new structure
+    real(wp),allocatable,dimension(:,:),intent(out) :: xyz_new !> Cartesian coordinates of atoms in the new structure
 
     !> Combine the original atoms and link atoms
-    nat_new = self%nat + self%nlink
-    allocate( at_new(nat_new))
-    allocate( xyz_new(3,nat_new))
-    at_new = [self%at, self%linkat]
-    xyz_new = reshape([self%xyz, self%linkxyz], [3,nat_new])
+    nat_new = self%nat+self%nlink
+    allocate (at_new(nat_new))
+    allocate (xyz_new(3,nat_new))
+    at_new = [self%at,self%linkat]
+    xyz_new = reshape([self%xyz,self%linkxyz], [3,nat_new])
 
   end subroutine extract_atoms_and_links
 
 !========================================================================================!
 
-! TODO: take gradient of dimension (3,nat_new) and distribute to grd and linkgrd
-   
-  subroutine gradient_distribution(self,grd)  
+  subroutine gradient_distribution(self,energy,grd)
+!****************************************************
+!* Distribute gradient of the model system to the
+!* structure_data type.
+!****************************************************
     implicit none
     class(structure_data) :: self
-    real(wp),dimension(:,:), intent(in) :: grd
+    real(wp),intent(in) :: energy
+    real(wp),dimension(:,:),intent(in) :: grd
     integer :: nat_new
 
+    self%energy_high = energy
+    !> Distribute the gradient to grd and linkgrd
     nat_new = size(grd,2)
-  
- !> Distribute the gradient to grd and linkgrd
-    self%grd = grd(:, 1:self%nat)
-    self%linkgrd = grd(:, self%nat + 1:nat_new)
+    self%grd = grd(:,1:self%nat)
+    self%linkgrd = grd(:,self%nat+1:nat_new)
 
   end subroutine gradient_distribution
 
-! TODO: a second routine should recieve energy and gradients and distribute it
-!       into grd and linkgrd accordingly Eq.6+8 -> Jacobian
+!========================================================================================!
 
-  
+  subroutine project_gradient(self,truenat,truegrd)
+!*********************************************************************
+!* The Jacobian is a 3m x 3n matrix ( Jaco(3*m,3*n) ), where
+!* m = nat+nlink of the fragment and
+!* n = nat of the full system
+!* assuming J_ij is a 3x3 diagonal matrix and o(i) is the mapping
+!* of the atom index i to the original system, then
+!*
+!*                                         ⎧ h   if ...
+!*      ⎛ J_11 ... J_1n ⎞                  ⎪ 1-h if ...
+!*  J = ⎜  ⋮   ⋱   ⋮    ⎟  with J_ij = E * ⎨ 1   if o(i) == j
+!*      ⎝ J_m1 ... J_mn ⎠                  ⎩ 0   else
+!*
+!*
+!* The gradient of the model system g' can then be projected into the
+!* basis of the real system  g = g'J
+!*********************************************************************
+    implicit none
+    class(structure_data) :: self
+    integer,intent(in) :: truenat
+    real(wp),intent(out),optional :: truegrd(3,truenat)
+!&<
+    real(wp),parameter :: E(3, 3) = reshape( &
+                & [ 1.0_wp, 0.0_wp, 0.0_wp,  &
+                &   0.0_wp, 1.0_wp, 0.0_wp,  &
+                &   0.0_wp, 0.0_wp, 1.0_wp], &
+                & shape(E))
+!&>
+    real(wp),allocatable :: Jaco(:,:)
+    real(wp),allocatable :: g(:)
+    integer :: m,n
+
+!>--- if self%gradient wasn't allocated so far, do it now
+    if (.not.allocated(self%gradient)) then
+      allocate (self%gradient(3,truenat),source=0.0_wp)
+      self%truenat = truenat
+    end if
+
+!>--- allocate J and g'
+    m = self%nat+self%nlink
+    n = truenat
+    allocate (g(3*m),source=0.0_wp)
+    g = reshape([self%grd,self%linkgrd], [3*m])
+    allocate (Jaco(3*m,3*n),source=0.0_wp)
+
+
+!>--- Set up the Jacobian
+
+!TODO, set up the Jacobian (Eq. 6+8), see comment above.
+! we might need to test around a bit
+! h is saved in self%link_g(:)
+
+ 
+!>--- calculate g = g'J  and save to self%gradient
+    self%gradient = reshape(matmul(g,Jaco), [3,truenat])
+    if (present(truegrd)) truegrd = self%gradient
+
+    deallocate (Jaco,g)
+  end subroutine project_gradient
+
 !========================================================================================!
   subroutine structure_data_deallocate(self)
 !**************************************************

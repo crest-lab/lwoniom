@@ -214,13 +214,13 @@ contains  !> MODULE PROCEDURES START HERE
     end do
 
     !> For the next steps we need some kind of connectivity information
-    allocate(bond_tmp(nat,nat), source = 0)
-    if( present(bond) ) then
-       !> if bond was provided, use those
-       bond_tmp = bond
+    allocate (bond_tmp(nat,nat),source=0)
+    if (present(bond)) then
+      !> if bond was provided, use those
+      bond_tmp = bond
     else
-        call lwoniom_rcov_bonds(nat,at,xyz,1.1_wp,bond_tmp) 
-    endif
+      call lwoniom_rcov_bonds(nat,at,xyz,1.1_wp,bond_tmp)
+    end if
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !  linking atoms between layers
@@ -229,7 +229,7 @@ contains  !> MODULE PROCEDURES START HERE
 !> at this point, dat%fragment should be set up
 !> what's missing are the linking atoms between the layers
 ! Determine the linking atoms between layers
-    call determine_linking_atoms(dat,bond_tmp)
+    call determine_linking_atoms(dat,at,xyz,bond_tmp)
 
     if ((io /= 0).and.pr) then
       write (myunit,'("Could not create lwONIOM object ",a)') source
@@ -243,42 +243,82 @@ contains  !> MODULE PROCEDURES START HERE
   end subroutine lwoniom_initialize
 
 !========================================================================================!
-  subroutine determine_linking_atoms(self,bond_tmp)
+  subroutine determine_linking_atoms(self,at,xyz,bond_tmp)
+!****************************************
+!* Set up link atoms for each fragment
+!****************************************
     implicit none
     type(lwoniom_data) :: self
-    integer,intent(in) :: bond_tmp(:,:)
+    integer,intent(in) :: at(:) !> atomic numbers of the original system    
+    real(wp),intent(in) :: xyz(:,:)  !> Cartesian coordinates of the original system
+    integer,intent(in) :: bond_tmp(:,:)  !> connectivity info of the original system
     integer :: i,j,k,l,m,nat,nat_fragment
 
-    integer, allocatable :: linking_atoms(:)   
+    integer,allocatable :: linking_atoms(:,:)
 
-    !TODO : somehow the code we had here was overwritten
-    !The are several loops:
-    ! 1. loop over all fragments
-    ! 2. loop over all atoms in the fragment
-    ! 3. check all bonds of the atom
-    ! 4. if the bond is to an atom that is NOT part of the same fragment, create link atom
-   
-   nat = size(bond_tmp,1)
-   allocate (linking_atoms(nat))
-    
-    do i=1,self%nfrag
+    !> nat is the original system's number of atoms
+    nat = size(bond_tmp,1) 
+    !> linking_atoms is our "work" array. it's second dimension is <nat for each fragment
+    allocate( linking_atoms(2,nat) )
+
+    !> loop over all fragments
+    do i = 1,self%nfrag
+
+      !> loop over all atoms in the fragments i
+      !> number of atoms in fragment i inherited from the original structure
       nat_fragment = self%fragment(i)%nat
-       m=0
-       linking_atoms=0
-         do j=1,nat_fragment
-         l=self%fragment(i)%opos(j)
-            do k=1,nat
-               if ( bond_tmp(l,k) .ne. 0 ) then
-                  if( .not. any(self%fragment(i)%opos(:) .eq. k)) then
-                    m=m+1
-                    linking_atoms(m) = k
-                  endif 
-               endif
-            enddo
-         enddo
-     enddo
-   
+      !> m will count the total number of link atoms in fragment i
+      m = 0
+      !> linking_atoms and m must be reset for each fragment
+      linking_atoms = 0
+      do j = 1,nat_fragment
+        
+        !> check all bonds of the atom, l is the atom's index in the original structure
+        l = self%fragment(i)%opos(j)
+        do k = 1,nat
 
+          !> if there is a bond between atoms l and k, ...
+          if (bond_tmp(l,k) .ne. 0) then
+ 
+            !> ... check if k is any of the atoms in fragment i
+            if (.not.any(self%fragment(i)%opos(:) .eq. k)) then
+
+            !> if k is NOT a member of the fragment, it must be a new link atom   
+            !> increment the number of link atoms
+              m = m+1
+            !> document the reference atom k for the link
+              linking_atoms(m,1) = k
+            !> document to which atom it is linked to, using the fragment atom index
+              linking_atoms(m,2) = j  !> i.e., j not l (!)
+            end if
+          end if
+        end do
+      end do
+
+      !TODO TODO TODO
+      !after having set up linking_atoms for fragment(i), we need to transfer 
+      !the information into self%fragment(i) right here, which is all the
+      !link... variables of this structure_data object, so for example:
+      self % fragment(i) % nlink = m
+      !this includes allocating the self%fragment(i)%link... arrays 
+      !TODO TODO TODO
+      !The new link atom (which will be mostly Hydrogen) will have it's
+      !position calculated by Eq.(1), so we also need to calculate
+      !the g factors from Eq.(2).
+      !I.e. we need a subroutine (or even better a function) that
+      ! takes the atom types of the original link atom, the
+      ! dummy link atom (Hydrogen) and the bonded partner (linking_atoms(m,2))
+      ! and calculates g. Put it to lwoniom_covrad.f90
+      !This needs to be done for each of the m link atoms in the fragment,
+      !and therefore another loop over all the link atoms goes here
+      do j=1,m  !we can re-use j since the other j loop already finished.
+        !...
+      enddo
+      !TODO TODO TODO
+
+    end do
+
+    deallocate( linking_atoms )
   end subroutine determine_linking_atoms
 !========================================================================================!
 
