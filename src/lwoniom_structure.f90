@@ -41,15 +41,15 @@ module lwoniom_structures
     !> energies for level of theory at current layer (high) and parent layer (low)
     real(wp) :: energy_high = 0.0_wp
     real(wp) :: energy_low = 0.0_wp
+    real(wp),allocatable :: gradient(:,:) !> gradient in the original system's dimension
+                                          !> projected via Jacobian
 
     !> system coordinates
     integer  :: nat = 0
     integer,allocatable  :: opos(:)   !> mapping of each atom in the original (topmost) layer
     integer,allocatable  :: at(:)     !> atomic number
     real(wp),allocatable :: xyz(:,:)  !> Cartesian coordinates, also atomic units -> Bohr
-    real(wp),allocatable :: grd(:,:,:)
-    !> grd should have dimension(3,nat,2)to store two gradients:
-    !> one for the layer (high) and one for the parent layer (low)
+    real(wp),allocatable :: grd(:,:)
 
     !> link atom coordinates
     integer :: nlink = 0
@@ -57,7 +57,7 @@ module lwoniom_structures
     integer,allocatable :: linksto(:)   !> links to which atom in this fragment?
     integer,allocatable :: linkat(:)    !> atom type (will be mostly H)
     real(wp),allocatable :: linkxyz(:,:)  !> Cartesian coordinates, in Bohr
-    real(wp),allocatable :: linkgrd(:,:,:) !> similar to grd, but for link atoms
+    real(wp),allocatable :: linkgrd(:,:) !> similar to grd, but for link atoms
 
     !> embedding information (TODO, for the future)
     !integer :: npoint
@@ -67,7 +67,6 @@ module lwoniom_structures
   contains
     procedure :: deallocate => structure_data_deallocate
     procedure :: add_child => structure_add_child
-    procedure :: write => structure_data_write_structure
     procedure :: extract => extract_atoms_and_links
   end type structure_data
 !**************************************************************************!
@@ -77,10 +76,6 @@ module lwoniom_structures
 contains  !> MODULE PROCEDURES START HERE
 !========================================================================================!
 !========================================================================================!
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!> ROUTINES GO HERE
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   subroutine extract_atoms_and_links(self, nat_new, at_new, xyz_new)
 !*****************************************************************
@@ -103,17 +98,16 @@ contains  !> MODULE PROCEDURES START HERE
   end subroutine extract_atoms_and_links
 
 !========================================================================================!
-  subroutine structure_data_write_structure(self)
-    implicit none
-    class(structure_data) :: self
 
-  !>   fragment(i)%write()
+! TODO: take gradient of dimension (3,nat_new) and distribute to grd and linkgrd
+  
 
-  end subroutine structure_data_write_structure
 
-!========================================================================================!
 ! TODO: a second routine should recieve energy and gradients and distribute it
-!       into grd and linkgrd accordingly Eq.6+8
+!       into grd and linkgrd accordingly Eq.6+8 -> Jacobian
+
+  
+
 
 !========================================================================================!
   subroutine structure_data_deallocate(self)
