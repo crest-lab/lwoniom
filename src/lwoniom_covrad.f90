@@ -62,5 +62,36 @@ module lwoniom_covrad
 
 !========================================================================================!
 !========================================================================================!
+ contains !> MODULE PROCEDURES START HERE
+!========================================================================================!
+!========================================================================================!
+
+ subroutine lwoniom_rcov_bonds(nat,at,xyz,factor,bond_tmp)
+!*****************************************************
+!* Determine a "mock-up" connectivity information
+!* based on the sum of covalent radii of two atoms:
+!* if R_ab <= (rcov_a + rcov_b)*factor, assume a bond
+!******************************************************
+    implicit none
+    !> INPUT
+    integer,intent(in) :: nat
+    integer,intent(in) :: at(nat)
+    real(wp),intent(in) :: xyz(3,nat)
+    real(wp),intent(in) :: factor
+    !> OUTPUT
+    integer,intent(out) :: bond_tmp(nat,nat)
+    !> LOCAL
+    integer :: i,j,k
+    real(wp) :: rab,rcovsum
+
+    bond_tmp(:,:) = 0
+ !TODO loop over all atom pairs (a,b), calculate their distance
+ !and check against the sum of their covalent radii * factor
+
+ end subroutine lwoniom_rcov_bonds
+
+
+!========================================================================================!
+!========================================================================================!
 end module lwoniom_covrad
 

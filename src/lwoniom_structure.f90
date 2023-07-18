@@ -82,26 +82,27 @@ contains  !> MODULE PROCEDURES START HERE
 !> ROUTINES GO HERE
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-! TODO: we need a routine that takes a structure_data object
-!       and returns  the variables nat, at, xyz for a newly build
-!       structure consisting out of the fragments atoms+link atoms
-
-!> Extracts the atoms and link atoms of the structure_data object into a new
-!structure
   subroutine extract_atoms_and_links(self, nat_new, at_new, xyz_new)
+!*****************************************************************
+!* Extracts the atoms and link atoms of the structure_data object
+!* into a new structure.
+!*****************************************************************
     implicit none
     class(structure_data) :: self
     integer, intent(out) :: nat_new    !> Number of atoms in the new structure
-    integer, dimension(:), intent(out) :: at_new   !> Atomic numbers of atoms in the new structure
-    real(wp), dimension(:,:), intent(out) :: xyz_new !> Cartesian coordinates of atoms in the new structure
+    integer,allocatable, dimension(:), intent(out) :: at_new   !> Atomic numbers of atoms in the new structure
+    real(wp),allocatable, dimension(:,:), intent(out) :: xyz_new !> Cartesian coordinates of atoms in the new structure
 
     !> Combine the original atoms and link atoms
     nat_new = self%nat + self%nlink
+    allocate( at_new(nat_new))
+    allocate( xyz_new(3,nat_new))
     at_new = [self%at, self%linkat]
     xyz_new = reshape([self%xyz, self%linkxyz], [3,nat_new])
 
   end subroutine extract_atoms_and_links
 
+!========================================================================================!
   subroutine structure_data_write_structure(self)
     implicit none
     class(structure_data) :: self
@@ -110,7 +111,7 @@ contains  !> MODULE PROCEDURES START HERE
 
   end subroutine structure_data_write_structure
 
-
+!========================================================================================!
 ! TODO: a second routine should recieve energy and gradients and distribute it
 !       into grd and linkgrd accordingly Eq.6+8
 

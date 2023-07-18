@@ -212,6 +212,18 @@ contains  !> MODULE PROCEDURES START HERE
       end if
     end do
 
+    !> For the next steps we need some kind of connectivity information
+    allocate(bond_tmp(nat,nat), source = 0)
+    if( present(bond) ) then
+       !> if bond was provided, use those
+       bond_tmp = bond
+    else
+       !TODO 
+       !> else, determine "mock-up" bonding information
+       ! maybe from covalent radii, see lwoniom_covrad.f90
+       ! call lwoniom_dummy_bonds(nat,at,xyz,1.1_wp,bond_tmp) 
+    endif
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !  linking atoms between layers
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -219,7 +231,7 @@ contains  !> MODULE PROCEDURES START HERE
 !> at this point, dat%fragment should be set up
 !> what's missing are the linking atoms between the layers
 ! Determine the linking atoms between layers
-    call determine_linking_atoms(dat)
+    call determine_linking_atoms(dat,bond_tmp)
 
     if ((io /= 0).and.pr) then
       write (myunit,'("Could not create lwONIOM object ",a)') source
@@ -232,42 +244,21 @@ contains  !> MODULE PROCEDURES START HERE
     if (allocated(indexf)) deallocate (indexf)
   end subroutine lwoniom_initialize
 
-  subroutine determine_linking_atoms(self)
+!========================================================================================!
+  subroutine determine_linking_atoms(self,bond_tmp)
     implicit none
-    class(lwoniom_data) :: self
+    type(lwoniom_data) :: self
+    integer,intent(in) :: bond_tmp(:,:)
     integer :: i,j,k,l
-    integer,allocatable :: linking_atoms(:)
 
-    allocate (linking_atoms(self%nlayer))
+    !TODO : somehow the code we had here was overwritten
+    !The are several loops:
+    ! 1. loop over all fragments
+    ! 2. loop over all atoms in the fragment
+    ! 3. check all bonds of the atom
+    ! 4. if the bond is to an atom that is NOT part of the same fragment, create link atom
 
-    do i = 1,self%nlayer
-      linking_atoms(i) = 0
-    end do
 
-    do i = 1,self%nlayer
-      do j = 1,self%nfrag
-        if (self%fragment(j)%layer == i) then
-          do k = 1,self%nfrag
-            if (self%fragment(k)%layer == i+1) then
-              do l = 1,self%fragment(k)%nat
-                if (any(self%fragment(j)%at == self%fragment(k)%at(l))) then
-                  linking_atoms(i) = self%fragment(j)%at(1)
-                  exit
-                end if
-              end do
-            end if
-          end do
-          exit
-        end if
-      end do
-    end do
-
-    write (*,*) "Linking atoms between layers:"
-    do i = 1,self%nlayer
-      write (*,*) "Layer",i,": Atom",linking_atoms(i)
-    end do
-
-    deallocate (linking_atoms)
   end subroutine determine_linking_atoms
 !========================================================================================!
 
