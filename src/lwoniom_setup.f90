@@ -287,9 +287,9 @@ contains  !> MODULE PROCEDURES START HERE
             !> increment the number of link atoms
               m = m+1
             !> document the reference atom k for the link
-              linking_atoms(m,1) = k
+              linking_atoms(1,m) = k
             !> document to which atom it is linked to, using the fragment atom index
-              linking_atoms(m,2) = j  !> i.e., j not l (!)
+              linking_atoms(2,m) = j  !> i.e., j not l (!)
             end if
           end if
         end do
