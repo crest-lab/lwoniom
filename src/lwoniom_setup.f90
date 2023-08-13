@@ -249,10 +249,12 @@ contains  !> MODULE PROCEDURES START HERE
 !****************************************
     implicit none
     type(lwoniom_data) :: self
+    type(structure_data) :: link_atom
+    type(structure_data) :: link_atom_index
     integer,intent(in) :: at(:) !> atomic numbers of the original system    
     real(wp),intent(in) :: xyz(:,:)  !> Cartesian coordinates of the original system
     integer,intent(in) :: bond_tmp(:,:)  !> connectivity info of the original system
-    integer :: i,j,k,l,m,nat,nat_fragment
+    integer :: i,j,k,l,m,n,nat,nat_fragment
 
     integer,allocatable :: linking_atoms(:,:)
 
@@ -295,6 +297,18 @@ contains  !> MODULE PROCEDURES START HERE
         end do
       end do
 
+
+      !> after having set up linking_atoms for fragment(i), we need to transfer 
+      !> the information into self%fragment(i) right here, which is all the
+      !> variables of this structure_data object, so for example:
+      self%fragment(i)%nlink = m
+      allocate(self%fragment(i)%link_atom(m,n))
+      allocate(self%fragment(i)%link_atom_index(m))
+      self%fragment(i)%link_atom(:,:) = linking_atoms(:,:)
+    end do
+
+
+ 
       !TODO TODO TODO
       !after having set up linking_atoms for fragment(i), we need to transfer 
       !the information into self%fragment(i) right here, which is all the
@@ -316,7 +330,7 @@ contains  !> MODULE PROCEDURES START HERE
       enddo
       !TODO TODO TODO
 
-    end do
+
 
     deallocate( linking_atoms )
   end subroutine determine_linking_atoms

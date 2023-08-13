@@ -60,7 +60,11 @@ module lwoniom_structures
     integer,allocatable :: linkat(:)      !> atom type (will be mostly H)
     real(wp),allocatable :: linkxyz(:,:)  !> Cartesian coordinates, in Bohr
     real(wp),allocatable :: linkgrd(:,:)  !> similar to grd, but for link atoms
-
+        
+    !>linking atoms
+    integer, allocatable :: link_atom(:,:)
+    integer, allocatable :: link_atom_index(:)
+ 
     !> embedding information (TODO, for the future)
     !integer :: npoint
     !real(wp),allocatable :: pointc(:)
