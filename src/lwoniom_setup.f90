@@ -249,12 +249,10 @@ contains  !> MODULE PROCEDURES START HERE
 !****************************************
     implicit none
     type(lwoniom_data) :: self
-    type(structure_data) :: link_atom
-    type(structure_data) :: link_atom_index
     integer,intent(in) :: at(:) !> atomic numbers of the original system    
     real(wp),intent(in) :: xyz(:,:)  !> Cartesian coordinates of the original system
     integer,intent(in) :: bond_tmp(:,:)  !> connectivity info of the original system
-    integer :: i,j,k,l,m,n,nat,nat_fragment
+    integer :: i,j,k,l,m,nat,nat_fragment
 
     integer,allocatable :: linking_atoms(:,:)
 
@@ -296,46 +294,19 @@ contains  !> MODULE PROCEDURES START HERE
           end if
         end do
       end do
-
-
-      !> after having set up linking_atoms for fragment(i), we need to transfer 
-      !> the information into self%fragment(i) right here, which is all the
-      !> variables of this structure_data object, so for example:
-      self%fragment(i)%nlink = m
-      allocate(self%fragment(i)%link_atom(m,n))
-      allocate(self%fragment(i)%link_atom_index(m))
-      self%fragment(i)%link_atom(:,:) = linking_atoms(:,:)
+      !>allocating m linking atoms for fragment i 
+      call self%fragment(i)%allocate_link(m)
+      call self%fragment(i)%set_link(nat,at,xyz,linking_atoms)
     end do
 
 
  
-      !TODO TODO TODO
-      !after having set up linking_atoms for fragment(i), we need to transfer 
-      !the information into self%fragment(i) right here, which is all the
-      !link... variables of this structure_data object, so for example:
-      self % fragment(i) % nlink = m
-      !this includes allocating the self%fragment(i)%link... arrays 
-      !TODO TODO TODO
-      !The new link atom (which will be mostly Hydrogen) will have it's
-      !position calculated by Eq.(1), so we also need to calculate
-      !the g factors from Eq.(2).
-      !I.e. we need a subroutine (or even better a function) that
-      ! takes the atom types of the original link atom, the
-      ! dummy link atom (Hydrogen) and the bonded partner (linking_atoms(m,2))
-      ! and calculates g. Put it to lwoniom_covrad.f90
-      !This needs to be done for each of the m link atoms in the fragment,
-      !and therefore another loop over all the link atoms goes here
-      do j=1,m  !we can re-use j since the other j loop already finished.
-        !...
-      enddo
-      !TODO TODO TODO
 
 
 
     deallocate( linking_atoms )
   end subroutine determine_linking_atoms
 !========================================================================================!
-
   subroutine lwoniom_data_deallocate(self)
 !****************************************************
 !* This subroutine deallocates a lwoniom_data object

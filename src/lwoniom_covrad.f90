@@ -61,6 +61,7 @@ module lwoniom_covrad
 !&>
 
   public :: lwoniom_rcov_bonds
+  public :: link_ratio_g
 
 !========================================================================================!
 !========================================================================================!
@@ -128,8 +129,6 @@ contains !> MODULE PROCEDURES START HERE
 
     ! Calculate the ratio from the covalent radii of the atoms
     g = (rcov_b + rcov_l) / (rcov_a + rcov_b)
-
-  !TODO calculate the ratio from the covalent radii of the atoms
 
   end function link_ratio_g 
 !========================================================================================!
