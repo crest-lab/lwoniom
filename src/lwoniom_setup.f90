@@ -56,6 +56,7 @@ module lwoniom_setup
     procedure :: info => print_lwoniom_info
     procedure :: deallocate => lwoniom_data_deallocate
     procedure :: add_fragment => lwoniom_add_fragment
+    procedure :: dump_fragments =>  lwoniom_dump_fragments
   end type lwoniom_data
 !************************************************************!
 
@@ -219,7 +220,7 @@ contains  !> MODULE PROCEDURES START HERE
       !> if bond was provided, use those
       bond_tmp = bond
     else
-      call lwoniom_rcov_bonds(nat,at,xyz,1.1_wp,bond_tmp)
+      call lwoniom_rcov_bonds(nat,at,xyz,1.15_wp,bond_tmp)
     end if
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -617,6 +618,21 @@ contains  !> MODULE PROCEDURES START HERE
 
     deallocate (taken)
   end subroutine fragment_set_atoms_QMMM
+
+!========================================================================================!
+  subroutine lwoniom_dump_fragments(self)
+!****************************************************
+!* Dump all fragments as .xyz
+!*****************************************************
+    implicit none
+    class(lwoniom_data) :: self
+    integer :: i
+
+     do i =1,self%nfrag
+       call self%fragment(i)%dump_fragment() 
+     enddo
+  end subroutine lwoniom_dump_fragments
+
 
 !========================================================================================!
 end module lwoniom_setup

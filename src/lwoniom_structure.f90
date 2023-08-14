@@ -73,7 +73,7 @@ module lwoniom_structures
     procedure :: gradient_distribution
     procedure :: allocate_link => allocating_linking_atoms
     procedure :: set_link => set_linking_atoms
-
+    procedure :: dump_fragment !> for testing
   end type structure_data
 !**************************************************************************!
 
@@ -276,8 +276,8 @@ contains  !> MODULE PROCEDURES START HERE
       j = linking_atoms(2,i)
       self%linksto(i) = j
       self%linkat(i) = 1
-      self%link_g(i) = link_ratio_g(at(j),at(k),self%linkat(i))
-      self%linkxyz(:,i) = link_position(xyz(:,j),xyz(:,k),self%link_g(i))
+      self%link_g(i) = link_ratio_g(at(k),at(j),self%linkat(i))
+      self%linkxyz(:,i) = link_position(xyz(:,k),xyz(:,j),self%link_g(i))
     end do
 
   end subroutine set_linking_atoms
@@ -295,6 +295,57 @@ contains  !> MODULE PROCEDURES START HERE
     rl(:) = rb(:)+g*(ra(:)-rb(:))
 
   end function link_position
+
+
+!========================================================================================!
+  subroutine dump_fragment(self)
+!********************************************************
+!* linking atoms space allocating
+!*******************************************************
+    implicit none
+    class(structure_data) :: self
+
+    character(len=100) :: fname    
+    integer :: n_tot,i,j,k,l,ich
+
+    !>--- Element symbols
+!&<
+  character(len=2),parameter :: PSE(118) = [ &
+ & 'H ',                                                                                'He', &
+ & 'Li','Be',                                                  'B ','C ','N ','O ','F ','Ne', &
+ & 'Na','Mg',                                                  'Al','Si','P ','S ','Cl','Ar', &
+ & 'K ','Ca','Sc','Ti','V ','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr', &
+ & 'Rb','Sr','Y ','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I ','Xe', &
+ & 'Cs','Ba','La',                                                                            &
+ &                'Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu',      &
+ &                'Hf','Ta','W ','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn', &
+ & 'Fr','Ra','Ac',                                                                            &
+ &                'Th','Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr',      &
+ &                'Rf','Db','Sg','Bh','Hs','Mt','Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og' ]
+
+  real(wp),parameter :: bohr = 0.52917726_wp
+  real(wp),parameter :: angstrom = 1.0_wp / bohr
+  real(wp),parameter :: autoaa = bohr
+  real(wp),parameter :: aatoau = angstrom
+
+!&>
+    write(fname,'(a,i0,a)') 'fragment.',self%id,'.xyz'
+
+    n_tot = self%nat + self%nlink
+    open(newunit=ich, file=trim(fname))    
+    write(ich,*) n_tot
+    write(ich,*)
+
+    do i=1,self%nat
+       write(ich,'(a2,3f16.8)') PSE(self%at(i)),self%xyz(:,i)*autoaa     
+    enddo
+
+    do i=1,self%nlink
+       write(ich,'(a2,3f16.8)') PSE(self%linkat(i)),self%linkxyz(:,i)*autoaa
+    enddo
+
+    close(ich)
+  end subroutine dump_fragment 
 
 !========================================================================================!
 
