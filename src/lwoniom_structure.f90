@@ -60,8 +60,7 @@ module lwoniom_structures
     integer,allocatable :: linkat(:)      !> atom type (will be mostly H)
     real(wp),allocatable :: linkxyz(:,:)  !> Cartesian coordinates, in Bohr
     real(wp),allocatable :: linkgrd(:,:)  !> similar to grd, but for link atoms
-        
- 
+
     !> embedding information (TODO, for the future)
     !integer :: npoint
     !real(wp),allocatable :: pointc(:)
@@ -74,7 +73,7 @@ module lwoniom_structures
     procedure :: gradient_distribution
     procedure :: allocate_link => allocating_linking_atoms
     procedure :: set_link => set_linking_atoms
- 
+
   end type structure_data
 !**************************************************************************!
 
@@ -172,14 +171,12 @@ contains  !> MODULE PROCEDURES START HERE
     g = reshape([self%grd,self%linkgrd], [3*m])
     allocate (Jaco(3*m,3*n),source=0.0_wp)
 
-
 !>--- Set up the Jacobian
 
 !TODO, set up the Jacobian (Eq. 6+8), see comment above.
 ! we might need to test around a bit
 ! h is saved in self%link_g(:)
 
- 
 !>--- calculate g = g'J  and save to self%gradient
     self%gradient = reshape(matmul(g,Jaco), [3,truenat])
     if (present(truegrd)) truegrd = self%gradient
@@ -245,16 +242,16 @@ contains  !> MODULE PROCEDURES START HERE
 !*******************************************************
     implicit none
     class(structure_data) :: self
-    integer :: m 
-    
+    integer :: m
+
     !> link atom coordinates
-     self%nlink = m
-   allocate(self%linkopos(m))    !> corresponds to which atom in original structure?
-   allocate(self%linksto(m))     !> links to which atom in this fragment?
-   allocate(self%link_g(m))     !> link model scaling parameter g
-   allocate(self%linkat(m))      !> atom type (will be mostly H)
-   allocate(self%linkxyz(3,m))  !> Cartesian coordinates, in Bohr
-   allocate(self%linkgrd(3,m))  !> similar to grd, but for link atoms
+    self%nlink = m
+    allocate (self%linkopos(m))    !> corresponds to which atom in original structure?
+    allocate (self%linksto(m))     !> links to which atom in this fragment?
+    allocate (self%link_g(m))     !> link model scaling parameter g
+    allocate (self%linkat(m))      !> atom type (will be mostly H)
+    allocate (self%linkxyz(3,m))  !> Cartesian coordinates, in Bohr
+    allocate (self%linkgrd(3,m))  !> similar to grd, but for link atoms
 
   end subroutine allocating_linking_atoms
 
@@ -267,45 +264,39 @@ contains  !> MODULE PROCEDURES START HERE
     implicit none
     class(structure_data) :: self
     integer :: m,nat
-    integer :: at(nat), linking_atoms(2,nat)
+    integer :: at(nat),linking_atoms(2,nat)
     real(wp),intent(in) :: xyz(3,nat)
     integer :: i,k,j
 
     !> link atom coordinates
-     m = self%nlink
-      do i=1,m
-        k =  linking_atoms(1,i)
-        self%linkopos(i) = k
-        j = linking_atoms(2,i)
-        self%linksto(i) = j
-        self%linkat(i) = 1
-        self%link_g(i) = link_ratio_g(at(j),at(k),self%linkat(i))
-        self%linkxyz(:,i) = link_position(xyz(:,j),xyz(:,k),self%link_g(i))         
-      enddo
+    m = self%nlink
+    do i = 1,m
+      k = linking_atoms(1,i)
+      self%linkopos(i) = k
+      j = linking_atoms(2,i)
+      self%linksto(i) = j
+      self%linkat(i) = 1
+      self%link_g(i) = link_ratio_g(at(j),at(k),self%linkat(i))
+      self%linkxyz(:,i) = link_position(xyz(:,j),xyz(:,k),self%link_g(i))
+    end do
 
   end subroutine set_linking_atoms
 
 !========================================================================================!
-    function link_position(ra,rb,g)  result(rl)
+  function link_position(ra,rb,g) result(rl)
 !**************************************************
 !* Calculates rl = rb + g(ra – rb)
 !***************************************************
-     implicit none
-     real(wp) :: g
-     real(wp) :: rl(3)
-     real(wp),intent(in) :: ra(3), rb(3)
+    implicit none
+    real(wp) :: g
+    real(wp) :: rl(3)
+    real(wp),intent(in) :: ra(3),rb(3)
 
-     rl(:) = rb(:) + g*(ra(:)-rb(:))
+    rl(:) = rb(:)+g*(ra(:)-rb(:))
 
-    end function link_position
+  end function link_position
 
 !========================================================================================!
 
-
-
 end module lwoniom_structures
-
-
-
-
 
