@@ -33,6 +33,7 @@ program lwoniom_main_tester
 
   real(wp) :: energy
   real(wp),allocatable :: gradient(:,:)
+  real(wp),allocatable :: refgrad(:,:)
   real(wp) :: gnorm
 
   logical :: fail,pr
@@ -88,6 +89,22 @@ program lwoniom_main_tester
 
   write(*,*) 'dumping fragments ... '
   call dat%dump_fragments()
+
+!=======================================================================================!
+  allocate(refgrad(3,nat),source=0.0_wp)
+  do i=1,dat%nfrag
+  dat%fragment(i)%grd = 1.0d0
+  dat%fragment(i)%linkgrd = 1.0d0
+   call dat%fragment(i)%jacobian(nat,gradient)
+  write (*,*) nat,dat%fragment(i)%nat,size(gradient,2),sum(gradient)/3.0d0
+    refgrad = 0.0d0
+    do j=1,dat%fragment(i)%nat
+      k = dat%fragment(i)%opos(j)
+      refgrad(:,k) = 1.0d0
+    enddo
+    write(*,*) 'gradient difference',sum(gradient(:,:)-refgrad(:,:))
+  enddo
+
 
 !=======================================================================================!
   deallocate (gradient)

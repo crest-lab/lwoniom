@@ -74,6 +74,7 @@ module lwoniom_structures
     procedure :: allocate_link => allocating_linking_atoms
     procedure :: set_link => set_linking_atoms
     procedure :: dump_fragment !> for testing
+    procedure :: jacobian => project_gradient
   end type structure_data
 !**************************************************************************!
 
@@ -139,7 +140,8 @@ contains  !> MODULE PROCEDURES START HERE
 !*  J = ⎜  ⋮   ⋱   ⋮    ⎟  with J_ij = E * ⎨ 1   if o(i) == j
 !*      ⎝ J_m1 ... J_mn ⎠                  ⎩ 0   else
 !*
-!*
+!*   h is saved in self%link_g(:)
+!*   h is our g from covrad
 !* The gradient of the model system g' can then be projected into the
 !* basis of the real system  g = g'J
 !*********************************************************************
@@ -155,8 +157,9 @@ contains  !> MODULE PROCEDURES START HERE
                 & shape(E))
 !&>
     real(wp),allocatable :: Jaco(:,:)
+    real(wp) :: Jij(3,3),x
     real(wp),allocatable :: g(:)
-    integer :: m,n
+    integer :: m,n,i,j,l,k
 
 !>--- if self%gradient wasn't allocated so far, do it now
     if (.not.allocated(self%gradient)) then
@@ -172,10 +175,24 @@ contains  !> MODULE PROCEDURES START HERE
     allocate (Jaco(3*m,3*n),source=0.0_wp)
 
 !>--- Set up the Jacobian
+    do i = 1,m
+      do j = 1,n
+        x = 0.0d0
+        if (i <= self%nat) then
+          if (self%opos(i) .eq. j) then
+            x = 1.0d0
+          else
+            x = 0.0d0
+          end if
+        end if
+        Jij(:,:) = E(:,:)*x
 
-!TODO, set up the Jacobian (Eq. 6+8), see comment above.
-! we might need to test around a bit
-! h is saved in self%link_g(:)
+!>---- Putting Jij into Jaco
+        l = (i-1)*3+1
+        k = (j-1)*3+1
+        Jaco(l:l+2,k:k+2) = Jij(:,:)
+      end do
+    end do
 
 !>--- calculate g = g'J  and save to self%gradient
     self%gradient = reshape(matmul(g,Jaco), [3,truenat])
@@ -296,7 +313,6 @@ contains  !> MODULE PROCEDURES START HERE
 
   end function link_position
 
-
 !========================================================================================!
   subroutine dump_fragment(self)
 !********************************************************
@@ -305,47 +321,47 @@ contains  !> MODULE PROCEDURES START HERE
     implicit none
     class(structure_data) :: self
 
-    character(len=100) :: fname    
+    character(len=100) :: fname
     integer :: n_tot,i,j,k,l,ich
 
     !>--- Element symbols
 !&<
-  character(len=2),parameter :: PSE(118) = [ &
- & 'H ',                                                                                'He', &
- & 'Li','Be',                                                  'B ','C ','N ','O ','F ','Ne', &
- & 'Na','Mg',                                                  'Al','Si','P ','S ','Cl','Ar', &
- & 'K ','Ca','Sc','Ti','V ','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr', &
- & 'Rb','Sr','Y ','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I ','Xe', &
- & 'Cs','Ba','La',                                                                            &
- &                'Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu',      &
- &                'Hf','Ta','W ','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn', &
- & 'Fr','Ra','Ac',                                                                            &
- &                'Th','Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr',      &
- &                'Rf','Db','Sg','Bh','Hs','Mt','Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og' ]
+    character(len=2),parameter :: PSE(118) = [ &
+   & 'H ',                                                                                'He', &
+   & 'Li','Be',                                                  'B ','C ','N ','O ','F ','Ne', &
+   & 'Na','Mg',                                                  'Al','Si','P ','S ','Cl','Ar', &
+   & 'K ','Ca','Sc','Ti','V ','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr', &
+   & 'Rb','Sr','Y ','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I ','Xe', &
+   & 'Cs','Ba','La',                                                                            &
+   &                'Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu',      &
+   &                'Hf','Ta','W ','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn', &
+   & 'Fr','Ra','Ac',                                                                            &
+   &                'Th','Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr',      &
+   &                'Rf','Db','Sg','Bh','Hs','Mt','Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og' ]
 
-  real(wp),parameter :: bohr = 0.52917726_wp
-  real(wp),parameter :: angstrom = 1.0_wp / bohr
-  real(wp),parameter :: autoaa = bohr
-  real(wp),parameter :: aatoau = angstrom
+    real(wp),parameter :: bohr = 0.52917726_wp
+    real(wp),parameter :: angstrom = 1.0_wp / bohr
+    real(wp),parameter :: autoaa = bohr
+    real(wp),parameter :: aatoau = angstrom
 
 !&>
-    write(fname,'(a,i0,a)') 'fragment.',self%id,'.xyz'
+    write (fname,'(a,i0,a)') 'fragment.',self%id,'.xyz'
 
-    n_tot = self%nat + self%nlink
-    open(newunit=ich, file=trim(fname))    
-    write(ich,*) n_tot
-    write(ich,*)
+    n_tot = self%nat+self%nlink
+    open (newunit=ich,file=trim(fname))
+    write (ich,*) n_tot
+    write (ich,*)
 
-    do i=1,self%nat
-       write(ich,'(a2,3f16.8)') PSE(self%at(i)),self%xyz(:,i)*autoaa     
-    enddo
+    do i = 1,self%nat
+      write (ich,'(a2,3f16.8)') PSE(self%at(i)),self%xyz(:,i)*autoaa
+    end do
 
-    do i=1,self%nlink
-       write(ich,'(a2,3f16.8)') PSE(self%linkat(i)),self%linkxyz(:,i)*autoaa
-    enddo
+    do i = 1,self%nlink
+      write (ich,'(a2,3f16.8)') PSE(self%linkat(i)),self%linkxyz(:,i)*autoaa
+    end do
 
-    close(ich)
-  end subroutine dump_fragment 
+    close (ich)
+  end subroutine dump_fragment
 
 !========================================================================================!
 
