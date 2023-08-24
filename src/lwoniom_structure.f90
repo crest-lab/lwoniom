@@ -44,6 +44,7 @@ module lwoniom_structures
     integer :: truenat
     real(wp),allocatable :: gradient(:,:) !> gradient in the original system's dimension
     !> projected via Jacobian
+    real(wp),allocatable :: Jaco(:,:)
 
     !> system coordinates
     integer  :: nat = 0
@@ -140,8 +141,7 @@ contains  !> MODULE PROCEDURES START HERE
 !*  J = ⎜  ⋮   ⋱   ⋮    ⎟  with J_ij = E * ⎨ 1   if o(i) == j
 !*      ⎝ J_m1 ... J_mn ⎠                  ⎩ 0   else
 !*
-!*   h is saved in self%link_g(:)
-!*   h is our g from covrad
+!*   h is saved in self%link_g(:), which is our g from covrad
 !* The gradient of the model system g' can then be projected into the
 !* basis of the real system  g = g'J
 !*********************************************************************
@@ -172,33 +172,37 @@ contains  !> MODULE PROCEDURES START HERE
     n = truenat
     allocate (g(3*m),source=0.0_wp)
     g = reshape([self%grd,self%linkgrd], [3*m])
-    allocate (Jaco(3*m,3*n),source=0.0_wp)
 
+    if (.not.allocated(self%Jaco)) then
+      allocate (Jaco(3*m,3*n),source=0.0_wp)
 !>--- Set up the Jacobian
-    do i = 1,m
-      do j = 1,n
-        x = 0.0d0
-        if (i <= self%nat) then
-          if (self%opos(i) .eq. j) then
-            x = 1.0d0
-          else
-            x = 0.0d0
+      do i = 1,m
+        do j = 1,n
+          x = 0.0d0
+          if (i <= self%nat) then
+            if (self%opos(i) .eq. j) then
+              x = 1.0d0
+            else
+              x = 0.0d0
+            end if
           end if
-        end if
-        Jij(:,:) = E(:,:)*x
+          Jij(:,:) = E(:,:)*x
 
-!>---- Putting Jij into Jaco
-        l = (i-1)*3+1
-        k = (j-1)*3+1
-        Jaco(l:l+2,k:k+2) = Jij(:,:)
+!>--- Putting Jij into Jaco
+          l = (i-1)*3+1
+          k = (j-1)*3+1
+          Jaco(l:l+2,k:k+2) = Jij(:,:)
+        end do
       end do
-    end do
+!>--- we save the Jacobian to self so we don't need to set it up again
+      call move_alloc(Jaco,self%Jaco)
+    end if
 
 !>--- calculate g = g'J  and save to self%gradient
-    self%gradient = reshape(matmul(g,Jaco), [3,truenat])
+    self%gradient = reshape(matmul(g,self%Jaco), [3,truenat])
     if (present(truegrd)) truegrd = self%gradient
 
-    deallocate (Jaco,g)
+    deallocate (g)
   end subroutine project_gradient
 
 !========================================================================================!
@@ -215,6 +219,7 @@ contains  !> MODULE PROCEDURES START HERE
     if (allocated(self%at)) deallocate (self%at)
     if (allocated(self%xyz)) deallocate (self%xyz)
     if (allocated(self%grd)) deallocate (self%grd)
+    if (allocated(self%Jaco)) deallocate (self%Jaco)
     self%nlink = 0
     if (allocated(self%linkat)) deallocate (self%linkat)
     if (allocated(self%linkxyz)) deallocate (self%linkxyz)
@@ -265,10 +270,10 @@ contains  !> MODULE PROCEDURES START HERE
     self%nlink = m
     allocate (self%linkopos(m))    !> corresponds to which atom in original structure?
     allocate (self%linksto(m))     !> links to which atom in this fragment?
-    allocate (self%link_g(m))     !> link model scaling parameter g
+    allocate (self%link_g(m))      !> link model scaling parameter g
     allocate (self%linkat(m))      !> atom type (will be mostly H)
-    allocate (self%linkxyz(3,m))  !> Cartesian coordinates, in Bohr
-    allocate (self%linkgrd(3,m))  !> similar to grd, but for link atoms
+    allocate (self%linkxyz(3,m))   !> Cartesian coordinates, in Bohr
+    allocate (self%linkgrd(3,m))   !> similar to grd, but for link atoms
 
   end subroutine allocating_linking_atoms
 
