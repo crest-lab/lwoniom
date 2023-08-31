@@ -92,9 +92,12 @@ contains  !> MODULE PROCEDURES START HERE
 !*****************************************************************
     implicit none
     class(structure_data) :: self
-    integer,intent(out) :: nat_new    !> Number of atoms in the new structure
-    integer,allocatable,dimension(:),intent(out) :: at_new   !> Atomic numbers of atoms in the new structure
-    real(wp),allocatable,dimension(:,:),intent(out) :: xyz_new !> Cartesian coordinates of atoms in the new structure
+    !> Number of atoms in the new structure
+    integer,intent(out) :: nat_new
+    !> Atomic numbers of atoms in the new   structure
+    integer,allocatable,dimension(:),intent(out) :: at_new
+    !> Cartesian coordinates of atoms in  the new structure
+    real(wp),allocatable,dimension(:,:),intent(out) :: xyz_new 
 
     !> Combine the original atoms and link atoms
     nat_new = self%nat+self%nlink
@@ -159,7 +162,7 @@ contains  !> MODULE PROCEDURES START HERE
     real(wp),allocatable :: Jaco(:,:)
     real(wp) :: Jij(3,3),x
     real(wp),allocatable :: g(:)
-    integer :: m,n,i,j,l,k
+    integer :: m,n,i,j,l,k,i2,i3
 
 !>--- if self%gradient wasn't allocated so far, do it now
     if (.not.allocated(self%gradient)) then
@@ -179,12 +182,17 @@ contains  !> MODULE PROCEDURES START HERE
       do i = 1,m
         do j = 1,n
           x = 0.0d0
-          if (i <= self%nat) then
+          if (i <= self%nat) then !> "true" atoms
             if (self%opos(i) .eq. j) then
               x = 1.0d0
             else
               x = 0.0d0
             end if
+          else !> link atoms
+            i2 = i - self%nat
+            i3 = self%linkopos(i2) 
+            !if(self%linkopos(i2)
+            x = 0.0d0
           end if
           Jij(:,:) = E(:,:)*x
 
@@ -240,7 +248,7 @@ contains  !> MODULE PROCEDURES START HERE
     integer :: n,n1
     integer,allocatable :: tmp(:)
     if (child%parent .ne. 0) then
-      write (stderr,'(a,i0,a)') 'warning: lwONIOM structure of layer ',child%layer, &
+      write (stderr,'(a,i0,a)') '**WARNING** lwONIOM structure of layer ',child%layer, &
       & ' was already associated with another parent layer!'
     end if
     child%parent = self%id
@@ -285,10 +293,11 @@ contains  !> MODULE PROCEDURES START HERE
     use lwoniom_covrad
     implicit none
     class(structure_data) :: self
-    integer :: m,nat
-    integer :: at(nat),linking_atoms(2,nat)
+    integer,intent(in) :: nat
+    integer,intent(in) :: at(nat)
+    integer,intent(in) :: linking_atoms(3,nat)
     real(wp),intent(in) :: xyz(3,nat)
-    integer :: i,k,j
+    integer :: i,k,j,m
 
     !> link atom coordinates
     m = self%nlink
@@ -297,18 +306,29 @@ contains  !> MODULE PROCEDURES START HERE
       self%linkopos(i) = k
       j = linking_atoms(2,i)
       self%linksto(i) = j
-      self%linkat(i) = 1
-      self%link_g(i) = link_ratio_g(at(k),at(j),self%linkat(i))
-      self%linkxyz(:,i) = link_position(xyz(:,k),xyz(:,j),self%link_g(i))
+      self%linkat(i) = 1 !> Hydrogen for cuts through single bonds
+      !self%linkat(i) = 2
+      if(linking_atoms(3,i) > 1)then
+        !> the linking atom is bound to multiple atoms in the fragment
+        !> which means this is a bad setup. We set g to one
+         self%link_g(i) = 1.0_wp 
+      else 
+        !> the regular case, cuts through single bonds
+        self%link_g(i) = link_ratio_g(at(k),at(j),self%linkat(i))
+      endif
+
+      self%linkxyz(:,i) = link_position(xyz(:,k), xyz(:,j), self%link_g(i))
     end do
 
   end subroutine set_linking_atoms
 
 !========================================================================================!
   function link_position(ra,rb,g) result(rl)
-!**************************************************
+!************************************************************
 !* Calculates rl = rb + g(ra – rb)
-!***************************************************
+!* a is the atom that is being replaced by the linking atom l
+!* b is the atom l is attached to.
+!************************************************************
     implicit none
     real(wp) :: g
     real(wp) :: rl(3)
@@ -320,9 +340,9 @@ contains  !> MODULE PROCEDURES START HERE
 
 !========================================================================================!
   subroutine dump_fragment(self)
-!********************************************************
+!**********************************
 !* linking atoms space allocating
-!*******************************************************
+!**********************************
     implicit none
     class(structure_data) :: self
 

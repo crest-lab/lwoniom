@@ -34,9 +34,6 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/modules/lwoniom-utils.cmake")
 set(fortran_minimal_versions "GNU;7.5" "Intel;19.0")
 check_minimal_compiler_version("Fortran" "${fortran_minimal_versions}")
 
-option(WITH_OpenMP "Enable support for shared memory parallelisation with OpenMP" TRUE)
-
-option(build_exe "Build a test binary?" FALSE)
 
 
 if(NOT DEFINED "${PROJECT_NAME}-dependency-method")
@@ -64,3 +61,22 @@ if(CMAKE_Fortran_COMPILER_ID MATCHES "PGI")
 endif()
 set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} ${bounds}" PARENT_SCOPE)
 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${dialect}" PARENT_SCOPE)
+
+
+# default for OpenMP
+option(WITH_OpenMP "Enable support for shared memory parallelisation with OpenMP" FALSE)
+
+# default for test binary
+option(build_exe "Build a test binary?" TRUE)
+
+# toml-f
+option(WITH_TOMLF "Enable build with toml-f support" TRUE)
+if(WITH_TOMLF)
+  find_package("toml-f" REQUIRED)
+  add_definitions(-DWITH_TOMLF)
+  list(
+    APPEND libs
+    toml-f::toml-f
+  )
+endif()
+

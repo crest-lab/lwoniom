@@ -158,4 +158,15 @@ endif
 ## ========================================= ##
 ## External subprojects
 ## ========================================= ##  
+# TOML-F
+if get_option('WITH_TOMLF')
+ add_project_arguments('-DWITH_TOMLF', language: 'fortran')
+ tomlf_dep = dependency(
+   'toml-f',
+   version: '>=0.2.0',
+   fallback: ['toml-f', 'tomlf_dep'],
+   default_options: ['default_library=static'],
+ )
+ exe_deps += tomlf_dep
+endif
 

@@ -17,7 +17,7 @@
 option(
   'la_backend',
   type: 'combo',
-  value: 'mkl-static',
+  value: 'custom',
   yield: true,
   choices: ['mkl', 'mkl-rt', 'mkl-static', 'openblas', 'netlib', 'custom'],
   description: 'Linear algebra backend for program.',
@@ -31,13 +31,19 @@ option(
 option(
   'openmp',
   type: 'boolean',
-  value: true,
+  value: false,
   yield: true,
   description: 'use OpenMP parallelisation',
 )
 option(
+  'WITH_TOMLF',
+  type: 'boolean',
+  value: true,
+  description: 'build with toml-f, a fortran parser for .toml files',
+)
+option(
   'build_exe',
   type: 'boolean',
-  value: false,
+  value: true,
   description: 'build with a test binary',
 )
