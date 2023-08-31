@@ -1,5 +1,6 @@
 
 srcs += files(
+   'lwoniom_parse.F90',
    'lwoniom_structure.f90',
    'lwoniom_covrad.f90',
    'lwoniom_setup.f90',

@@ -56,7 +56,7 @@ module lwoniom_setup
     procedure :: info => print_lwoniom_info
     procedure :: deallocate => lwoniom_data_deallocate
     procedure :: add_fragment => lwoniom_add_fragment
-    procedure :: dump_fragments =>  lwoniom_dump_fragments
+    procedure :: dump_fragments => lwoniom_dump_fragments
   end type lwoniom_data
 !************************************************************!
 
@@ -250,7 +250,7 @@ contains  !> MODULE PROCEDURES START HERE
 !****************************************
     implicit none
     type(lwoniom_data) :: self
-    integer,intent(in) :: at(:) !> atomic numbers of the original system    
+    integer,intent(in) :: at(:) !> atomic numbers of the original system
     real(wp),intent(in) :: xyz(:,:)  !> Cartesian coordinates of the original system
     integer,intent(in) :: bond_tmp(:,:)  !> connectivity info of the original system
     integer :: i,j,k,l,m,nat,nat_fragment
@@ -258,9 +258,9 @@ contains  !> MODULE PROCEDURES START HERE
     integer,allocatable :: linking_atoms(:,:)
 
     !> nat is the original system's number of atoms
-    nat = size(bond_tmp,1) 
+    nat = size(bond_tmp,1)
     !> linking_atoms is our "work" array. it's second dimension is <nat for each fragment
-    allocate( linking_atoms(3,nat) )
+    allocate (linking_atoms(3,nat))
 
     !> loop over all fragments
     do i = 1,self%nfrag
@@ -281,40 +281,40 @@ contains  !> MODULE PROCEDURES START HERE
 
           !> if there is a bond between atoms l and k, ...
           if (bond_tmp(l,k) .ne. 0) then
-            
+
             !> ... check if k is any of the atoms in fragment i
             !> if k is NOT a member of the fragment, it must be a new link atom
             if (.not.any(self%fragment(i)%opos(:) .eq. k)) then
-            
-            !> The only exception is when k is already a link atom for another atom   
-            if( any(linking_atoms(1,:).eq.k)) then
-              m2 = minloc(abs(linking_atoms(1,:)-k),1)
-              k2 = linking_atoms(1,m2)
-              linking_atoms(3,m2) = linking_atoms(3,m2) + 1
-              !write(*,*) k,k2,linking_atoms(1,k2)-k
-              write(stdout,'(a,2(i0,a),i0)') '**WARNING** Bad setup - linking atom ',m2, &
-              &  ' (atom ',k2,') is connected to multiple atoms in fragment ',i
-              cycle 
-            endif
 
-            !> increment the number of link atoms
+              !> The only exception is when k is already a link atom for another atom
+              if (any(linking_atoms(1,:) .eq. k)) then
+                m2 = minloc(abs(linking_atoms(1,:)-k),1)
+                k2 = linking_atoms(1,m2)
+                linking_atoms(3,m2) = linking_atoms(3,m2)+1
+                !write(*,*) k,k2,linking_atoms(1,k2)-k
+                write (stdout,'(a,2(i0,a),i0)') '**WARNING** Bad setup - linking atom ',m2, &
+                &  ' (atom ',k2,') is connected to multiple atoms in fragment ',i
+                cycle
+              end if
+
+              !> increment the number of link atoms
               m = m+1
-            !> document the reference atom k for the link
+              !> document the reference atom k for the link
               linking_atoms(1,m) = k
-            !> document to which atom it is linked to, using the fragment atom index
+              !> document to which atom it is linked to, using the fragment atom index
               linking_atoms(2,m) = j  !> i.e., j not l (!)
-            !> count the number of connections for the link atom
-              linking_atoms(3,m) = linking_atoms(3,m) + 1
+              !> count the number of connections for the link atom
+              linking_atoms(3,m) = linking_atoms(3,m)+1
             end if
           end if
         end do
       end do
-      !>allocating m linking atoms for fragment i 
+      !>allocating m linking atoms for fragment i
       call self%fragment(i)%allocate_link(m)
       call self%fragment(i)%set_link(nat,at,xyz,linking_atoms)
     end do
 
-    deallocate( linking_atoms )
+    deallocate (linking_atoms)
   end subroutine determine_linking_atoms
 !========================================================================================!
   subroutine lwoniom_data_deallocate(self)
@@ -637,11 +637,10 @@ contains  !> MODULE PROCEDURES START HERE
     class(lwoniom_data) :: self
     integer :: i
 
-     do i =1,self%nfrag
-       call self%fragment(i)%dump_fragment() 
-     enddo
+    do i = 1,self%nfrag
+      call self%fragment(i)%dump_fragment()
+    end do
   end subroutine lwoniom_dump_fragments
-
 
 !========================================================================================!
 end module lwoniom_setup

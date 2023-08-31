@@ -18,12 +18,14 @@
 !================================================================================!
 module lwoniom_interface
   use iso_fortran_env,only:wp => real64,stdout => output_unit
+  use lwoniom_parse
   use lwoniom_setup
   use lwoniom_engrad
   implicit none
   private
 
-!> re-exports
+!> RE-exports
+  public :: lwoniom_parse_inputfile
   public :: lwoniom_data,lwoniom_initialize
 
 !========================================================================================!

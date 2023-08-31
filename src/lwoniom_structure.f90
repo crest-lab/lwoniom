@@ -97,7 +97,7 @@ contains  !> MODULE PROCEDURES START HERE
     !> Atomic numbers of atoms in the new   structure
     integer,allocatable,dimension(:),intent(out) :: at_new
     !> Cartesian coordinates of atoms in  the new structure
-    real(wp),allocatable,dimension(:,:),intent(out) :: xyz_new 
+    real(wp),allocatable,dimension(:,:),intent(out) :: xyz_new
 
     !> Combine the original atoms and link atoms
     nat_new = self%nat+self%nlink
@@ -189,8 +189,8 @@ contains  !> MODULE PROCEDURES START HERE
               x = 0.0d0
             end if
           else !> link atoms
-            i2 = i - self%nat
-            i3 = self%linkopos(i2) 
+            i2 = i-self%nat
+            i3 = self%linkopos(i2)
             !if(self%linkopos(i2)
             x = 0.0d0
           end if
@@ -308,16 +308,16 @@ contains  !> MODULE PROCEDURES START HERE
       self%linksto(i) = j
       self%linkat(i) = 1 !> Hydrogen for cuts through single bonds
       !self%linkat(i) = 2
-      if(linking_atoms(3,i) > 1)then
+      if (linking_atoms(3,i) > 1) then
         !> the linking atom is bound to multiple atoms in the fragment
         !> which means this is a bad setup. We set g to one
-         self%link_g(i) = 1.0_wp 
-      else 
+        self%link_g(i) = 1.0_wp
+      else
         !> the regular case, cuts through single bonds
         self%link_g(i) = link_ratio_g(at(k),at(j),self%linkat(i))
-      endif
+      end if
 
-      self%linkxyz(:,i) = link_position(xyz(:,k), xyz(:,j), self%link_g(i))
+      self%linkxyz(:,i) = link_position(xyz(:,k),xyz(:,j),self%link_g(i))
     end do
 
   end subroutine set_linking_atoms

@@ -20,6 +20,7 @@ program lwoniom_main_tester
   use iso_fortran_env,only:wp => real64,stdout => output_unit
   use testmol
   use lwoniom_interface
+  use lwoniom_parse
   implicit none
 
   integer :: nat
@@ -68,7 +69,16 @@ program lwoniom_main_tester
 !> STANDARD USAGE
 !=======================================================================================!
 !=======================================================================================!
-
+  write (*,*)
+  write (*,*) '============================================================'
+  write (*,*) '==================== lwONIOM INPUT ========================='
+  write (*,*) '============================================================'
+  write (*,*)
+  block
+   type(lwoniom_input) :: inp
+   
+   call lwoniom_parse_inputfile('input.toml',inp)
+  endblock
   write (*,*)
   write (*,*) '============================================================'
   write (*,*) '==================== lwONIOM SETUP ========================='
