@@ -39,10 +39,13 @@ module lwoniom_structures
     integer :: parent = 0
     integer,allocatable :: child(:)
     !> energies for level of theory at current layer (high) and parent layer (low)
-    real(wp) :: energy_high = 0.0_wp
-    real(wp) :: energy_low = 0.0_wp
+    real(wp) :: energy_high = 0.0_wp  !> high = QM
+    real(wp) :: energy_low = 0.0_wp   !> low  = MM/CC
+    real(wp) :: energy_qq = 0.0_wp
     integer :: truenat
-    real(wp),allocatable :: gradient(:,:) !> gradient in the original system's dimension
+    real(wp),allocatable :: gradient_high(:,:) !> gradient in the original system's dimension
+    real(wp),allocatable :: gradient_low(:,:)  !> gradient in the original system's dimension
+    real(wp),allocatable :: gradient_qq(:,:) 
     !> projected via Jacobian
     real(wp),allocatable :: Jaco(:,:)
 
@@ -51,7 +54,8 @@ module lwoniom_structures
     integer,allocatable  :: opos(:)   !> mapping of each atom in the original (topmost) layer
     integer,allocatable  :: at(:)     !> atomic number
     real(wp),allocatable :: xyz(:,:)  !> Cartesian coordinates, also atomic units -> Bohr
-    real(wp),allocatable :: grd(:,:)
+    real(wp),allocatable :: grd_high(:,:)
+    real(wp),allocatable :: grd_low(:,:)
 
     !> link atom coordinates
     integer :: nlink = 0
@@ -60,7 +64,8 @@ module lwoniom_structures
     real(wp),allocatable :: link_g(:)     !> link model scaling parameter g
     integer,allocatable :: linkat(:)      !> atom type (will be mostly H)
     real(wp),allocatable :: linkxyz(:,:)  !> Cartesian coordinates, in Bohr
-    real(wp),allocatable :: linkgrd(:,:)  !> similar to grd, but for link atoms
+    real(wp),allocatable :: linkgrd_high(:,:)  !> similar to grd, but for link atoms
+    real(wp),allocatable :: linkgrd_low(:,:)  !> similar to grd, but for link atoms
 
     !> embedding information (TODO, for the future)
     !integer :: npoint
@@ -75,7 +80,7 @@ module lwoniom_structures
     procedure :: allocate_link => allocating_linking_atoms
     procedure :: set_link => set_linking_atoms
     procedure :: dump_fragment !> for testing
-    procedure :: jacobian => project_gradient
+    procedure :: jacobian => project_gradient_highlow
   end type structure_data
 !**************************************************************************!
 
@@ -110,28 +115,35 @@ contains  !> MODULE PROCEDURES START HERE
 
 !========================================================================================!
 
-  subroutine gradient_distribution(self,energy,grd)
+  subroutine gradient_distribution(self,energy_high,grd_high,energy_low,grd_low)
 !****************************************************
 !* Distribute gradient of the model system to the
 !* structure_data type.
 !****************************************************
     implicit none
     class(structure_data) :: self
-    real(wp),intent(in) :: energy
-    real(wp),dimension(:,:),intent(in) :: grd
+    real(wp),intent(in) :: energy_high,energy_low
+    real(wp),dimension(:,:),intent(in) :: grd_high
+    real(wp),dimension(:,:),intent(in) :: grd_low
     integer :: nat_new
 
-    self%energy_high = energy
+    self%energy_high = energy_high
     !> Distribute the gradient to grd and linkgrd
-    nat_new = size(grd,2)
-    self%grd = grd(:,1:self%nat)
-    self%linkgrd = grd(:,self%nat+1:nat_new)
+    nat_new = size(grd_high,2)
+    self%grd_high = grd_high(:,1:self%nat)
+    self%linkgrd_high = grd_high(:,self%nat+1:nat_new)
+
+    self%energy_low = energy_low
+    !> Distribute the gradient to grd and linkgrd
+    nat_new = size(grd_low,2)
+    self%grd_low = grd_low(:,1:self%nat)
+    self%linkgrd_low = grd_low(:,self%nat+1:nat_new)
 
   end subroutine gradient_distribution
 
 !========================================================================================!
 
-  subroutine project_gradient(self,truenat,truegrd)
+  subroutine project_gradient(self,fragnat,fraggrd,truenat,truegrd)
 !*********************************************************************
 !* The Jacobian is a 3m x 3n matrix ( Jaco(3*m,3*n) ), where
 !* m = nat+nlink of the fragment and
@@ -150,8 +162,10 @@ contains  !> MODULE PROCEDURES START HERE
 !*********************************************************************
     implicit none
     class(structure_data) :: self
+    integer,intent(in) :: fragnat
+    real(wp),intent(in) :: fraggrd(3,fragnat)
     integer,intent(in) :: truenat
-    real(wp),intent(out),optional :: truegrd(3,truenat)
+    real(wp),intent(out) :: truegrd(3,truenat)
 !&<
     real(wp),parameter :: E(3, 3) = reshape( &
                 & [ 1.0_wp, 0.0_wp, 0.0_wp,  &
@@ -164,17 +178,16 @@ contains  !> MODULE PROCEDURES START HERE
     real(wp),allocatable :: g(:)
     integer :: m,n,i,j,l,k,i2,i3
 
-!>--- if self%gradient wasn't allocated so far, do it now
-    if (.not.allocated(self%gradient)) then
-      allocate (self%gradient(3,truenat),source=0.0_wp)
-      self%truenat = truenat
-    end if
+!>--- reset
+    truegrd = 0.d0
+    self%truenat = truenat
 
 !>--- allocate J and g'
-    m = self%nat+self%nlink
+    m = fragnat != self%nat+self%nlink
     n = truenat
     allocate (g(3*m),source=0.0_wp)
-    g = reshape([self%grd,self%linkgrd], [3*m])
+    !g = reshape([self%grd,self%linkgrd], [3*m])
+    g = reshape(fraggrd, [3*m])
 
     if (.not.allocated(self%Jaco)) then
       allocate (Jaco(3*m,3*n),source=0.0_wp)
@@ -207,11 +220,57 @@ contains  !> MODULE PROCEDURES START HERE
     end if
 
 !>--- calculate g = g'J  and save to self%gradient
-    self%gradient = reshape(matmul(g,self%Jaco), [3,truenat])
-    if (present(truegrd)) truegrd = self%gradient
+    truegrd(:,:) = reshape(matmul(g,self%Jaco), [3,truenat])
+    !if (present(truegrd)) truegrd = self%gradient
 
     deallocate (g)
   end subroutine project_gradient
+
+!========================================================================================!
+
+  subroutine project_gradient_highlow(self,truenat)
+!*******************************************************
+!* Project both the high and low level gradients
+!* of the fragment into dimensions of the "true" system
+!*******************************************************
+    implicit none
+    class(structure_data) :: self
+    integer,intent(in) :: truenat
+    integer :: m,n,i,j,l,k,i2,i3
+    integer :: fragnat
+    real(wp),allocatable :: g_high(:,:),g_low(:,:)
+
+    !> determine the total number of atoms in fragment
+    fragnat = self%nat+self%nlink
+
+    if (allocated(self%grd_high)) then
+      !> combine atoms and linkatoms into a single gradient
+      !> for both high and low levels
+      allocate (g_high(3,fragnat),source=0.0d0)
+
+      g_high(:,1:self%nat) = self%grd_high(:,:)
+      g_high(:,self%nat+1:) = self%linkgrd_high(:,:)
+
+      !> allocate and call project_gradient for high level
+      if (.not.allocated(self%gradient_high)) allocate (self%gradient_high(3,truenat))
+      call project_gradient(self,fragnat,g_high,truenat,self%gradient_high)
+    end if
+
+    if (allocated(self%grd_low)) then
+      !> combine atoms and linkatoms into a single gradient
+      !> for both high and low levels
+      allocate (g_low(3,fragnat),source=0.0d0)
+      g_low(:,1:self%nat) = self%grd_low(:,:)
+      g_low(:,self%nat+1:) = self%linkgrd_low(:,:)
+
+      !> allocate and call project_gradient for low level
+      if (.not.allocated(self%gradient_low)) allocate (self%gradient_low(3,truenat))
+      call project_gradient(self,fragnat,g_low,truenat,self%gradient_low)
+    end if
+
+    deallocate (g_high)
+    deallocate (g_low)
+  end subroutine project_gradient_highlow
 
 !========================================================================================!
   subroutine structure_data_deallocate(self)
@@ -226,12 +285,14 @@ contains  !> MODULE PROCEDURES START HERE
     self%nat = 0
     if (allocated(self%at)) deallocate (self%at)
     if (allocated(self%xyz)) deallocate (self%xyz)
-    if (allocated(self%grd)) deallocate (self%grd)
+    if (allocated(self%grd_high)) deallocate (self%grd_high)
+    if (allocated(self%grd_low)) deallocate (self%grd_low)
     if (allocated(self%Jaco)) deallocate (self%Jaco)
     self%nlink = 0
     if (allocated(self%linkat)) deallocate (self%linkat)
     if (allocated(self%linkxyz)) deallocate (self%linkxyz)
-    if (allocated(self%linkgrd)) deallocate (self%linkgrd)
+    if (allocated(self%linkgrd_high)) deallocate (self%linkgrd_high)
+    if (allocated(self%linkgrd_low)) deallocate (self%linkgrd_low)
     !self%npoint = 0
     !if (allocated(self%pointc)) deallocate (self%pointc)
     !if (allocated(self%pointxyz)) deallocate (self%pointxyz)
@@ -281,7 +342,8 @@ contains  !> MODULE PROCEDURES START HERE
     allocate (self%link_g(m))      !> link model scaling parameter g
     allocate (self%linkat(m))      !> atom type (will be mostly H)
     allocate (self%linkxyz(3,m))   !> Cartesian coordinates, in Bohr
-    allocate (self%linkgrd(3,m))   !> similar to grd, but for link atoms
+    allocate (self%linkgrd_high(3,m))  !> similar to grd, but for link atoms (high level)
+    allocate (self%linkgrd_low(3,m))   !> similar to grd, but for link atoms (low level)
 
   end subroutine allocating_linking_atoms
 

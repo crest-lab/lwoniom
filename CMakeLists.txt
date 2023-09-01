@@ -71,6 +71,14 @@ list(
 set(srcs)
 add_subdirectory("src")
 
+if(WITH_TOMLF)
+  find_package("toml-f" REQUIRED)
+  add_definitions(-DWITH_TOMLF)
+  list(
+    APPEND libs
+    toml-f::toml-f
+  )
+endif()
 
 #
 # Build the lib

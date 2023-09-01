@@ -71,12 +71,12 @@ option(build_exe "Build a test binary?" TRUE)
 
 # toml-f
 option(WITH_TOMLF "Enable build with toml-f support" TRUE)
-if(WITH_TOMLF)
-  find_package("toml-f" REQUIRED)
-  add_definitions(-DWITH_TOMLF)
-  list(
-    APPEND libs
-    toml-f::toml-f
-  )
-endif()
+#if(WITH_TOMLF)
+#  find_package("toml-f" REQUIRED)
+#  add_definitions(-DWITH_TOMLF)
+#  list(
+#    APPEND libs
+#    toml-f::toml-f
+#  )
+#endif()
 

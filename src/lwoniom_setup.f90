@@ -533,7 +533,11 @@ contains  !> MODULE PROCEDURES START HERE
     allocate (frag%opos(natf),source=0)
     allocate (frag%at(natf),source=0)
     allocate (frag%xyz(3,natf),source=0.0_wp)
-    allocate (frag%grd(3,natf),source=0.0_wp)
+    if(frag%layer /= 1)then
+      allocate (frag%grd_high(3,natf),source=0.0_wp)
+    endif
+    allocate (frag%grd_low(3,natf),source=0.0_wp)
+
     n = 0
     do i = 1,nat
       if (taken(i)) then
@@ -614,7 +618,11 @@ contains  !> MODULE PROCEDURES START HERE
     allocate (frag%opos(natf),source=0)
     allocate (frag%at(natf),source=0)
     allocate (frag%xyz(3,natf),source=0.0_wp)
-    allocate (frag%grd(3,natf),source=0.0_wp)
+    if(frag%layer /= 1)then
+      allocate (frag%grd_high(3,natf),source=0.0_wp)
+    endif
+    allocate (frag%grd_low(3,natf),source=0.0_wp)
+
     n = 0
     do i = 1,nat
       if (taken(i)) then
