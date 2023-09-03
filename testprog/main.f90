@@ -71,16 +71,6 @@ program lwoniom_main_tester
 !=======================================================================================!
   write (*,*)
   write (*,*) '============================================================'
-  write (*,*) '==================== lwONIOM INPUT ========================='
-  write (*,*) '============================================================'
-  write (*,*)
-  block
-   type(lwoniom_input) :: inp
-   
-   call lwoniom_parse_inputfile('input.toml',inp)
-  endblock
-  write (*,*)
-  write (*,*) '============================================================'
   write (*,*) '==================== lwONIOM SETUP ========================='
   write (*,*) '============================================================'
   write (*,*)
@@ -90,30 +80,33 @@ program lwoniom_main_tester
     call lwoniom_initialize(nat,at,xyz,dat,layer)
     call dat%info()
 
+
+  write(*,*) 'dumping fragments ... '
+  call dat%dump_fragments()
+
+
+  call dat%deallocate()
   write (*,*)
   write (*,*) '========================== END ============================='
   write (*,*) '==================== lwONIOM SETUP ========================='
   write (*,*) '========================== END ============================='
 
 !=======================================================================================!
+  write (*,*)
+  write (*,*) '============================================================'
+  write (*,*) '==================== lwONIOM INPUT ========================='
+  write (*,*) '============================================================'
+  write (*,*)
+ 
+  call lwoniom_new_calculator('input.toml',dat)
 
-  write(*,*) 'dumping fragments ... '
-  call dat%dump_fragments()
 
-!=======================================================================================!
-!  allocate(refgrad(3,nat),source=0.0_wp)
-!  do i=1,dat%nfrag
-!  dat%fragment(i)%grd = 1.0d0
-!  dat%fragment(i)%linkgrd = 1.0d0
-!   call dat%fragment(i)%jacobian(nat,gradient)
-!  write (*,*) nat,dat%fragment(i)%nat,size(gradient,2),sum(gradient)/3.0d0
-!    refgrad = 0.0d0
-!    do j=1,dat%fragment(i)%nat
-!      k = dat%fragment(i)%opos(j)
-!      refgrad(:,k) = 1.0d0
-!    enddo
-!    write(*,*) 'gradient difference',sum(gradient(:,:)-refgrad(:,:))
-!  enddo
+  write (*,*)
+  write (*,*) '========================== END ============================='
+  write (*,*) '==================== lwONIOM INPUT ========================='
+  write (*,*) '========================== END ============================='
+
+
 
 
 !=======================================================================================!

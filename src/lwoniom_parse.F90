@@ -37,17 +37,39 @@ module lwoniom_parse
     integer,allocatable :: layer(:)
     integer,allocatable :: frag(:)
     character(len=:),allocatable :: wbofile
+    real(wp),allocatable :: wbo(:,:)
+    character(len=2),allocatable :: zsym(:)
+    real(wp),allocatable :: xyz(:,:)
+  contains  
+     procedure :: deallocate => deallocate_lwoniom_input  
   end type lwoniom_input
 
 !> printout param
-   character(len=*),parameter,private :: ns = 'lwONIOM> '
-   character(len=*),parameter,private :: clears = '         '
+  character(len=*),parameter,private :: ns = 'lwONIOM> '
+  character(len=*),parameter,private :: clears = '         '
 
 !========================================================================================!
 !========================================================================================!
 contains  !> MODULE PROCEDURES START HERE
 !========================================================================================!
 !========================================================================================!
+
+  subroutine deallocate_lwoniom_input(self)
+    implicit none
+    class(lwoniom_input) :: self
+    if(allocated(self%structurefile)) deallocate(self%structurefile)
+    self%nat = 0
+    self%maxfragments = 0
+    self%maxlayers = 0
+    if(allocated(self%layer)) deallocate(self%layer)
+    if(allocated(self%frag)) deallocate(self%frag)
+    if(allocated(self%wbofile)) deallocate(self%wbofile)
+    if(allocated(self%wbo)) deallocate(self%wbo)
+    if(allocated(self%zsym)) deallocate(self%zsym)
+    if(allocated(self%xyz)) deallocate(self%xyz)
+  end subroutine deallocate_lwoniom_input
+
+!=======================================================================================!
 
   subroutine lwoniom_parse_inputfile(tomlfile,input)
     implicit none
@@ -106,9 +128,11 @@ contains  !> MODULE PROCEDURES START HERE
     !> Data structure
     type(toml_table),intent(inout) :: table
     type(toml_table),pointer :: child
-    integer :: io,i,j,k,l
+    integer :: io,i,j,k,l,tmpnat
     integer :: ikey
     type(toml_key),allocatable :: list(:)
+    character(len=:),allocatable :: key
+    character(len=:),allocatable :: val
 
     !> first get total number of atoms and allocate
     call get_value(table,"natoms",input%nat,stat=io)
@@ -118,6 +142,34 @@ contains  !> MODULE PROCEDURES START HERE
     end if
     allocate (input%layer(input%nat),source=0)
     allocate (input%frag(input%nat),source=0)
+
+    !> iterate over keys (to check for input xyz, and other info)
+    call table%get_keys(list)
+    do ikey = 1,size(list)
+      key = list(ikey)%key
+      select case (key)
+      case ('structure','struct','input','xyz')
+        !> try to parse an xyz file
+        call get_value(table,key,input%structurefile,stat=io)
+        if (io == toml_stat%success) then
+          write (stdout,'(a,a,a)') ns,'reading XYZ from ',trim(input%structurefile)
+          call read_xyz(input%structurefile,tmpnat,input%zsym,input%xyz)
+          if (tmpnat /= input%nat) then
+            write (stderr,'("**ERROR** ",3a)') "mismatch of number of atoms in [lwoniom] block ", &
+            & 'and ',input%structurefile
+            return
+          end if
+        end if
+
+      case ('wbo','bo','topo')
+        !> try to read a file containing bond info
+        call get_value(table,key,input%wbofile,stat=io)
+        if (io == toml_stat%success) then
+          call read_bo(input%wbofile,input%nat,input%wbo)
+        end if
+
+      end select
+    end do
 
     !> atom-wise definitions of fragments first
     call get_value(table,'fragment',child,requested=.false.)
@@ -186,7 +238,7 @@ contains  !> MODULE PROCEDURES START HERE
               allocate (frag(input%nat))
               do i = 1,input%nat
                 frag(i) = i
-              enddo
+              end do
               call set_fragment(input,f,frag)
             end select
           end if
@@ -265,7 +317,7 @@ contains  !> MODULE PROCEDURES START HERE
       if (input%frag(j) > f) then
         write (stdout,'(a,i0)') '**WARNING** atom ',j,' already defined in fragment ',input%frag(j)
       else
-        c = c + 1
+        c = c+1
         input%frag(j) = f
       end if
     end do
@@ -301,6 +353,57 @@ contains  !> MODULE PROCEDURES START HERE
       end if
     end do
   end subroutine set_layer
+
+!========================================================================================!
+
+  subroutine read_xyz(fname,nat,zsym,xyz)
+    implicit none
+    character(len=*),intent(in) :: fname
+    integer,intent(out) :: nat
+    character(len=2),intent(out),allocatable :: zsym(:)
+    real(wp),intent(out),allocatable :: xyz(:,:)
+    integer :: ich,i,j,k,l
+    logical :: ex
+    character(len=256) :: atmp
+    inquire (file=fname,exist=ex)
+    if (ex) then
+      open (newunit=ich,file=fname)
+      read (ich,*) nat
+      allocate (zsym(nat))
+      allocate (xyz(3,nat),source=0.0_wp)
+      read (ich,'(a)') atmp
+      do i = 1,nat
+        read (ich,*) zsym(i),xyz(1:3,i)
+      end do
+      close (ich)
+    end if
+  end subroutine read_xyz
+
+!========================================================================================!
+
+  subroutine read_bo(fname,nat,bo)
+    implicit none
+    character(len=*),intent(in) :: fname
+    integer,intent(in) :: nat
+    real(wp),intent(out),allocatable :: bo(:,:)
+    integer :: ich,i,j,k,l,io
+    logical :: ex
+    character(len=256) :: atmp
+    real(wp) :: dum
+    inquire (file=fname,exist=ex)
+    if (ex) then
+      open (newunit=ich,file=fname)
+      allocate (bo(nat,nat))
+      do
+        read (ich,'(a)',iostat=io) atmp
+        if (io /= 0) exit
+        read (atmp,*) i,j,dum
+        bo(i,j) = dum
+        bo(j,i) = dum
+      end do
+      close (ich)
+    end if
+  end subroutine read_bo
 
 !========================================================================================!
 !========================================================================================!

@@ -84,6 +84,28 @@ module lwoniom_structures
   end type structure_data
 !**************************************************************************!
 
+    !>--- Element symbols
+!&<
+    character(len=2),parameter :: PSE(118) = [ &
+   & 'H ',                                                                                'He', &
+   & 'Li','Be',                                                  'B ','C ','N ','O ','F ','Ne', &
+   & 'Na','Mg',                                                  'Al','Si','P ','S ','Cl','Ar', &
+   & 'K ','Ca','Sc','Ti','V ','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr', &
+   & 'Rb','Sr','Y ','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I ','Xe', &
+   & 'Cs','Ba','La',                                                                            &
+   &                'Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu',      &
+   &                'Hf','Ta','W ','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn', &
+   & 'Fr','Ra','Ac',                                                                            &
+   &                'Th','Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr',      &
+   &                'Rf','Db','Sg','Bh','Hs','Mt','Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og' ]
+
+    real(wp),parameter :: bohr = 0.52917726_wp
+    real(wp),parameter :: angstrom = 1.0_wp / bohr
+    real(wp),parameter :: autoaa = bohr
+    real(wp),parameter :: aatoau = angstrom
+!&>
+    public :: zsym_to_at
+
 !========================================================================================!
 !========================================================================================!
 contains  !> MODULE PROCEDURES START HERE
@@ -411,27 +433,6 @@ contains  !> MODULE PROCEDURES START HERE
     character(len=100) :: fname
     integer :: n_tot,i,j,k,l,ich
 
-    !>--- Element symbols
-!&<
-    character(len=2),parameter :: PSE(118) = [ &
-   & 'H ',                                                                                'He', &
-   & 'Li','Be',                                                  'B ','C ','N ','O ','F ','Ne', &
-   & 'Na','Mg',                                                  'Al','Si','P ','S ','Cl','Ar', &
-   & 'K ','Ca','Sc','Ti','V ','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr', &
-   & 'Rb','Sr','Y ','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I ','Xe', &
-   & 'Cs','Ba','La',                                                                            &
-   &                'Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu',      &
-   &                'Hf','Ta','W ','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn', &
-   & 'Fr','Ra','Ac',                                                                            &
-   &                'Th','Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr',      &
-   &                'Rf','Db','Sg','Bh','Hs','Mt','Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og' ]
-
-    real(wp),parameter :: bohr = 0.52917726_wp
-    real(wp),parameter :: angstrom = 1.0_wp / bohr
-    real(wp),parameter :: autoaa = bohr
-    real(wp),parameter :: aatoau = angstrom
-
-!&>
     write (fname,'(a,i0,a)') 'fragment.',self%id,'.xyz'
 
     n_tot = self%nat+self%nlink
@@ -449,6 +450,35 @@ contains  !> MODULE PROCEDURES START HERE
 
     close (ich)
   end subroutine dump_fragment
+
+!========================================================================================!
+
+  function zsym_to_at(zsym) result(at)
+     implicit none
+     character(len=*) :: zsym
+     integer :: at
+     integer :: i,j
+     at = 0
+     do i=1,size(PSE,1)    
+       if(trim(lowercase(zsym)) .eq. trim(lowercase(PSE(i)))) at = i
+     enddo
+  end function zsym_to_at
+
+  function lowerCase(s)
+    implicit none
+    character(len=*),intent(in) :: s
+    character(len=:),allocatable :: sout
+    character(len=:),allocatable :: lowerCase
+    integer :: ic,i
+    character(26),Parameter :: high = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    character(26),Parameter :: low = 'abcdefghijklmnopqrstuvwxyz'
+    sout = s
+    do i = 1,LEN_TRIM(s)
+      ic = INDEX(high,s(i:i))
+      if (ic > 0) sout(i:i) = low(ic:ic)
+    end do
+    call move_alloc(sout,lowerCase)
+  end function lowerCase
 
 !========================================================================================!
 
