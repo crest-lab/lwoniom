@@ -423,13 +423,13 @@ contains  !> MODULE PROCEDURES START HERE
   end function link_position
 
 !========================================================================================!
-  subroutine dump_fragment(self)
+  subroutine dump_fragment(self,xyz)
 !**********************************
 !* linking atoms space allocating
 !**********************************
     implicit none
     class(structure_data) :: self
-
+    real(wp),intent(in),optional :: xyz(:,:)
     character(len=100) :: fname
     integer :: n_tot,i,j,k,l,ich
 
@@ -437,7 +437,11 @@ contains  !> MODULE PROCEDURES START HERE
 
     n_tot = self%nat+self%nlink
     open (newunit=ich,file=trim(fname))
+    if(present(xyz))then
+    write(ich,*) size(xyz,2)
+    else
     write (ich,*) n_tot
+    endif
     write (ich,*)
 
     do i = 1,self%nat
@@ -447,6 +451,15 @@ contains  !> MODULE PROCEDURES START HERE
     do i = 1,self%nlink
       write (ich,'(a2,3f16.8)') PSE(self%linkat(i)),self%linkxyz(:,i)*autoaa
     end do
+
+    if(present(xyz))then
+      do i=1,size(xyz,2)
+         if(.not.any(self%opos(:).eq.i) .and. &
+         &  .not.any(self%linkopos(:).eq.i) )then
+       write (ich,'(a2,3f16.8)') 'He',xyz(:,i)*autoaa         
+         endif 
+      enddo
+    endif
 
     close (ich)
   end subroutine dump_fragment

@@ -81,8 +81,8 @@ program lwoniom_main_tester
     call dat%info()
 
 
-  write(*,*) 'dumping fragments ... '
-  call dat%dump_fragments()
+  !write(*,*) 'dumping fragments ... '
+  !call dat%dump_fragments(xyz)
 
 
   call dat%deallocate()
@@ -98,8 +98,10 @@ program lwoniom_main_tester
   write (*,*) '============================================================'
   write (*,*)
  
+  call dat%deallocate()
   call lwoniom_new_calculator('input.toml',dat)
-
+  call dat%info()
+  call dat%dump_fragments(xyz)
 
   write (*,*)
   write (*,*) '========================== END ============================='

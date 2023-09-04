@@ -637,16 +637,17 @@ contains  !> MODULE PROCEDURES START HERE
   end subroutine fragment_set_atoms_QMMM
 
 !========================================================================================!
-  subroutine lwoniom_dump_fragments(self)
+  subroutine lwoniom_dump_fragments(self,xyz)
 !****************************************************
 !* Dump all fragments as .xyz
 !*****************************************************
     implicit none
     class(lwoniom_data) :: self
+    real(wp),intent(in),optional :: xyz(:,:)
     integer :: i
 
     do i = 1,self%nfrag
-      call self%fragment(i)%dump_fragment()
+      call self%fragment(i)%dump_fragment(xyz)
     end do
   end subroutine lwoniom_dump_fragments
 
