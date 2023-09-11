@@ -67,7 +67,8 @@ set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${dialect}" PARENT_SCOPE)
 option(WITH_OpenMP "Enable support for shared memory parallelisation with OpenMP" FALSE)
 
 # default for test binary
-option(build_exe "Build a test binary?" TRUE)
+option(build_test "Build a test binary?" TRUE) 
+option(build_exe "Build app binary?" TRUE)
 
 # toml-f
 option(WITH_TOMLF "Enable build with toml-f support" TRUE)

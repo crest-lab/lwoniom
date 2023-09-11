@@ -104,7 +104,7 @@ module lwoniom_structures
     real(wp),parameter :: autoaa = bohr
     real(wp),parameter :: aatoau = angstrom
 !&>
-    public :: zsym_to_at
+    public :: zsym_to_at,lowercase
 
 !========================================================================================!
 !========================================================================================!

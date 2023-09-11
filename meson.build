@@ -22,6 +22,7 @@ subdir('config')
 
 # Collect source of the project
 prog = []
+tester = []
 srcs = []
 subdir('src')
 
@@ -44,11 +45,22 @@ lwoniom_dep = declare_dependency(
 )
 
 
-# Create executable target
-if get_option('build_exe')
+# Create tester target
+if get_option('build_test')
 subdir('testprog')
 lwoniom_exe = executable(
   'lwoniom-tester',
+  sources: tester,
+  dependencies: lwoniom_dep,
+  install: install,
+  link_language: 'fortran',
+)
+endif
+
+if get_option('build_exe')
+subdir('app')
+lwoniom_exe = executable(
+  'lwoniom-app',
   sources: prog,
   dependencies: lwoniom_dep,
   install: install,

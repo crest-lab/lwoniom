@@ -113,7 +113,7 @@ target_link_libraries(
 #
 # Executables
 #
-IF(build_exe)
+IF(build_test)
 set(srcs2)
 add_subdirectory("testprog")
 add_executable(
@@ -133,6 +133,29 @@ target_link_libraries(
   "lib${PROJECT_NAME}.a"
 )
 ENDIF()
+
+IF(build_exe)
+set(srcs3)
+add_subdirectory("app")
+add_executable(
+  ${PROJECT_NAME}-app
+  "${srcs3}"
+)
+set_target_properties(
+  ${PROJECT_NAME}-app
+  PROPERTIES
+  Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/include
+  RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}
+  OUTPUT_NAME "${PROJECT_NAME}-app"
+)
+target_link_libraries(
+  ${PROJECT_NAME}-app
+  PRIVATE
+  "lib${PROJECT_NAME}.a"
+)
+ENDIF()
+
+
 
 #
 # Export targets for other projects

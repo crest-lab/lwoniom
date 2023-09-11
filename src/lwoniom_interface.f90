@@ -28,11 +28,15 @@ module lwoniom_interface
   real(wp),parameter :: bohr = 0.52917726_wp
 
 !> RE-exports
-  public :: lwoniom_parse_inputfile
+  public :: lwoniom_input,lwoniom_parse_inputfile
   public :: lwoniom_data,lwoniom_initialize
 
 !> interface routines
   public :: lwoniom_new_calculator
+  interface lwoniom_new_calculator
+    module procedure :: lwoniom_new_calculator_file
+    module procedure :: lwoniom_new_calculator_inp
+  end interface lwoniom_new_calculator
 
 !========================================================================================!
 !========================================================================================!
@@ -40,29 +44,21 @@ contains  !> MODULE PROCEDURES START HERE
 !========================================================================================!
 !========================================================================================!
 
-  subroutine lwoniom_new_calculator(inputfile,dat)
-!******************************************************
-!* This routine will attempt to read a TMOL input file
-!* specified as 'inputfile' and create the
-!* lwoniom_data object 'dat'
-!******************************************************
+  subroutine lwoniom_new_calculator_inp(inp,dat)
+!*****************************************************************
+!* This routine will attempt create the lwoniom_data object 'dat'
+!* from a previously parsed lwoniom_input object containing the
+!* setup information
+!****************************************************************
     implicit none
     !> input file name, TOML format
-    character(len=*),intent(in) :: inputfile
+    type(lwoniom_input),intent(inout) :: inp
     !> the calculator/data type to be created
     type(lwoniom_data),intent(out) :: dat
     !> LOCAL
-    type(lwoniom_input) :: inp  !> temporary storage
     integer :: i,j,k,l
     integer,allocatable :: at(:),bond(:,:)
     logical :: ex
-
-    inquire (file=inputfile,exist=ex)
-    if (.not.ex) then
-      write (stderr,'("**ERROR** ",3a)') "Input file ",trim(inputfile)," was not found!"
-      return
-    end if
-    call lwoniom_parse_inputfile(inputfile,inp)
 
     if (allocated(inp%xyz).and.allocated(inp%zsym).and. &
         allocated(inp%layer).and.allocated(inp%frag)) then
@@ -90,12 +86,43 @@ contains  !> MODULE PROCEDURES START HERE
 
       end if
     else
-      write (stderr,'("**ERROR** ",a)') "Input setup info missing!"
+      write (stderr,'("**ERROR** ",a)') "Required lwoniom_input setup info missing!"
       return
     end if
 
+  end subroutine lwoniom_new_calculator_inp
+
+!========================================================================================!
+
+  subroutine lwoniom_new_calculator_file(inputfile,dat)
+!**************************************************************
+!* This routine will attempt to read a TMOL input file
+!* specified as 'inputfile' and create the
+!* lwoniom_data object 'dat'.
+!* This is a wrapper for lwoniom_new_calculator_inp.
+!* Obviously, ALL information must be present in the inputfile
+!**************************************************************
+    implicit none
+    !> input file name, TOML format
+    character(len=*),intent(in) :: inputfile
+    !> the calculator/data type to be created
+    type(lwoniom_data),intent(out) :: dat
+    !> LOCAL
+    type(lwoniom_input) :: inp  !> temporary storage
+    integer :: i,j,k,l
+    integer,allocatable :: at(:),bond(:,:)
+    logical :: ex
+
+    inquire (file=inputfile,exist=ex)
+    if (.not.ex) then
+      write (stderr,'("**ERROR** ",3a)') "Input file ",trim(inputfile)," was not found!"
+      return
+    end if
+    call lwoniom_parse_inputfile(inputfile,inp)
+    call lwoniom_new_calculator_inp(inp,dat)
+
     call inp%deallocate()
-  end subroutine lwoniom_new_calculator
+  end subroutine lwoniom_new_calculator_file
 
 !========================================================================================!
 !========================================================================================!

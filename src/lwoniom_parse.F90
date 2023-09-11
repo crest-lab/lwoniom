@@ -42,6 +42,7 @@ module lwoniom_parse
     real(wp),allocatable :: xyz(:,:)
   contains  
      procedure :: deallocate => deallocate_lwoniom_input  
+     procedure :: parse_xyz => parse_structure_xyz
   end type lwoniom_input
 
 !> printout param
@@ -148,7 +149,7 @@ contains  !> MODULE PROCEDURES START HERE
     do ikey = 1,size(list)
       key = list(ikey)%key
       select case (key)
-      case ('structure','struct','input','xyz')
+      case ('structure','struct','input','xyz','struc')
         !> try to parse an xyz file
         call get_value(table,key,input%structurefile,stat=io)
         if (io == toml_stat%success) then
@@ -376,8 +377,22 @@ contains  !> MODULE PROCEDURES START HERE
         read (ich,*) zsym(i),xyz(1:3,i)
       end do
       close (ich)
+    else
+      write(stderr,'(a)') '**ERROR** Input file '//trim(fname)//' does not exist'
     end if
   end subroutine read_xyz
+
+!========================================================================================!
+
+  subroutine parse_structure_xyz(input,fname)
+    implicit none
+    class(lwoniom_input) :: input
+    character(len=*),intent(in) :: fname
+    integer :: tmpnat
+    input%structurefile = fname
+    call read_xyz(input%structurefile,tmpnat,input%zsym,input%xyz) 
+    if(input%nat == 0 ) input%nat = tmpnat
+  end subroutine parse_structure_xyz
 
 !========================================================================================!
 

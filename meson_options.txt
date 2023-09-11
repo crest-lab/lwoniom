@@ -45,5 +45,13 @@ option(
   'build_exe',
   type: 'boolean',
   value: true,
-  description: 'build with a test binary',
+  description: 'build the app binary',
 )
+
+option(
+  'build_test',
+  type: 'boolean',
+  value: true,
+  description: 'build the tester binary',
+)
+
