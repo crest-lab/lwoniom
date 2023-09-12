@@ -104,7 +104,8 @@ contains !> MODULE PROCEDURES START HERE
   subroutine lwoniom_write_example
     use iso_fortran_env,only:stdout => output_unit
     call write_example_xyz
-    write (stdout,'(a,i0,a)') 'A test system with ',testnat,' atoms was written to example.xyz'
+    call write_example_wbo()
+    write (stdout,'(a,i0,a)') 'A test system with ',testnat,' atoms was written to example.xyz with bond orders written to example.wbo'
     call write_example_toml
     write (stdout,'(a)') 'A matching TOML input file was written to example.toml'
     write (stdout,'(a)') 'To run the example use:'
@@ -134,6 +135,9 @@ contains !> MODULE PROCEDURES START HERE
     write (ich,'(a,i0)') 'natoms = ',testnat
     write (ich,'(a)') '# Then, the XYZ file name can be given. Alternatively, use the CMD argument -i'
     write (ich,'(a)') "xyz = 'example.xyz'"
+    write (ich,'(a)') '# Optionally, some topology or bond order can be defined.'
+    write (ich,'(a)') '# If this is left out, the connectivity is determined from vdW radii'
+    write (ich,'(a)') "topo = 'example.wbo'"
     write (ich,*)
     write (ich,'(a)') '# Next, fragments must be defined on an by-atom basis'
     write (ich,'(a)') '# An ascending fragment numbering is assumed, i.e., fragment.1 will be the parent system'
@@ -148,6 +152,84 @@ contains !> MODULE PROCEDURES START HERE
 
     close (ich)
   end subroutine write_example_toml
+
+  subroutine write_example_wbo()
+    open (newunit=ich,file='example.wbo')
+    write (ich,*) '  1           2   1.01729604304517'
+    write (ich,*) '  3           4   1.39609843958358'
+    write (ich,*) '  3           5   1.46602784797405'
+    write (ich,*) '  4           6   1.46565611403330'
+    write (ich,*) '  5           6  0.101345456355059'
+    write (ich,*) '  5           7   1.36711046885915'
+    write (ich,*) '  6           8   1.36748279135540'
+    write (ich,*) '  7           8   1.29143574380122'
+    write (ich,*) '  7           9   1.10226836455661'
+    write (ich,*) '  8          10   1.10192788385741'
+    write (ich,*) ' 11          13   1.46659493332072'
+    write (ich,*) ' 11          14   1.36647128034093'
+    write (ich,*) ' 12          14   1.10310178829216'
+    write (ich,*) ' 14          15   1.29127183677095'
+    write (ich,*) ' 13          16   1.39528946920885'
+    write (ich,*) ' 15          17   1.10265113429527'
+    write (ich,*) ' 11          19  0.101264488083657'
+    write (ich,*) ' 15          19   1.36672154565427'
+    write (ich,*) ' 16          19   1.46655913087465'
+    write (ich,*) ' 20          22   1.10213590877487'
+    write (ich,*) ' 21          23   1.10238083518347'
+    write (ich,*) ' 22          23   1.29145306024621'
+    write (ich,*) ' 22          24   1.36721607232915'
+    write (ich,*) ' 23          25   1.36692374191389'
+    write (ich,*) ' 24          25  0.101374062315517'
+    write (ich,*) ' 24          26   1.46590794134137'
+    write (ich,*) ' 25          27   1.46623545066360'
+    write (ich,*) ' 26          27   1.39588535582142'
+    write (ich,*) ' 28          30   1.10249037811830'
+    write (ich,*) ' 29          30   1.36685483044953'
+    write (ich,*) ' 18          31   1.10311910970472'
+    write (ich,*) ' 30          31   1.29126517938622'
+    write (ich,*) ' 29          32   1.46646978441658'
+    write (ich,*) ' 29          33  0.101249377874012'
+    write (ich,*) ' 31          33   1.36654751417851'
+    write (ich,*) ' 32          34   1.39535830312099'
+    write (ich,*) ' 33          34   1.46653041131279'
+    write (ich,*) '  9          35   1.38965912512928'
+    write (ich,*) ' 12          35   1.38872425175313'
+    write (ich,*) ' 10          36   1.38966725736963'
+    write (ich,*) ' 28          36   1.38877692628201'
+    write (ich,*) '  2          37  0.679342691489296'
+    write (ich,*) '  9          37   1.21572538125398'
+    write (ich,*) ' 10          37   1.21573328676422'
+    write (ich,*) '  2          38  0.680063790573794'
+    write (ich,*) ' 12          38   1.21551064322122'
+    write (ich,*) ' 17          38   1.21590833628423'
+    write (ich,*) '  2          39  0.680150805699592'
+    write (ich,*) ' 18          39   1.21578297220138'
+    write (ich,*) ' 28          39   1.21572234694470'
+    write (ich,*) '  2          40  0.679807738236767'
+    write (ich,*) ' 20          40   1.21543409422235'
+    write (ich,*) ' 21          40   1.21554271006388'
+    write (ich,*) ' 17          41   1.38852878757390'
+    write (ich,*) ' 20          41   1.38982404256268'
+    write (ich,*) ' 18          42   1.38846591634075'
+    write (ich,*) ' 21          42   1.38977577451738'
+    write (ich,*) '  5          43  0.967133545619961'
+    write (ich,*) '  6          44  0.967188977669226'
+    write (ich,*) ' 11          45  0.967150460898219'
+    write (ich,*) ' 13          46  0.970459872819479'
+    write (ich,*) ' 16          47  0.970462460383186'
+    write (ich,*) ' 19          48  0.967147291832744'
+    write (ich,*) ' 24          49  0.967189604121997'
+    write (ich,*) ' 25          50  0.967135972728045'
+    write (ich,*) ' 26          51  0.970506488154401'
+    write (ich,*) ' 27          52  0.970451454778270'
+    write (ich,*) ' 32          53  0.970466179470778'
+    write (ich,*) ' 29          54  0.967151031821086'
+    write (ich,*) ' 33          55  0.967136756645038'
+    write (ich,*) ' 34          56  0.970457642858038'
+    write (ich,*) '  3          57  0.970451089355716'
+    write (ich,*) '  4          58  0.970509200719757'
+    close (ich)
+  end subroutine write_example_wbo
 
 !========================================================================================!
 !========================================================================================!

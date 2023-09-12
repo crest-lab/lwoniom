@@ -40,6 +40,7 @@ module lwoniom_parse
     real(wp),allocatable :: wbo(:,:)
     character(len=2),allocatable :: zsym(:)
     real(wp),allocatable :: xyz(:,:)
+    character(len=:),allocatable :: cmd(:)
   contains  
      procedure :: deallocate => deallocate_lwoniom_input  
      procedure :: parse_xyz => parse_structure_xyz
@@ -166,6 +167,7 @@ contains  !> MODULE PROCEDURES START HERE
         !> try to read a file containing bond info
         call get_value(table,key,input%wbofile,stat=io)
         if (io == toml_stat%success) then
+          write (stdout,'(a,a,a)') ns,'reading bonds from ',trim(input%wbofile)
           call read_bo(input%wbofile,input%nat,input%wbo)
         end if
 
@@ -188,6 +190,20 @@ contains  !> MODULE PROCEDURES START HERE
       end if
       call read_lwoniom_layer(error,input,child)
     end if
+
+
+    !> then fragment-wise definition of subprocesses to calculate energies and gradients
+    !> note: this is only for the app usage
+    call get_value(table,'cmd',child,requested=.false.)
+    if (associated(child)) then
+      if (input%maxlayers < 1) then
+        write (stderr,'("**ERROR** ",a)') 'CMDs must not be defined without defining layers first'
+        stop
+      end if
+      allocate(input%cmd( input%maxlayers ), source=repeat(" ",200))
+      call read_lwoniom_processcmd(error,input,child)
+    end if
+
 
   end subroutine read_lwoniom_block
 
@@ -294,6 +310,53 @@ contains  !> MODULE PROCEDURES START HERE
     end do
 
   end subroutine read_lwoniom_layer
+
+
+  subroutine read_lwoniom_processcmd(error,input,table)
+!*******************************************************
+!* Read all process commands
+!* Note, there must be one process command per layer as
+!* each layer corresponds to one level of theory
+!*******************************************************
+    !> Error handler
+    type(toml_error),allocatable :: error
+    !> Hamiltonian input to be read
+    type(lwoniom_input),intent(inout) :: input
+    !> Data structure
+    type(toml_table),intent(inout) :: table
+    type(toml_table),pointer :: child
+    integer :: io,i,j,k,l,f,io2,io3
+    integer :: ikey
+    type(toml_key),allocatable :: list(:)
+    type(toml_array),pointer    :: arr
+    character(len=:),allocatable :: key
+    character(len=:),allocatable :: val
+    integer,allocatable :: lay(:)
+
+    !> iterate over keys (which should be integer numbers)
+    call table%get_keys(list)
+    if(size(list) .ne. input%maxlayers)then
+      write (stderr,'("**ERROR** ",a)') 'Please define a CMD for all layers!'
+      error stop
+    endif
+    do ikey = 1,size(list)
+      key = list(ikey)%key
+      read (key,*,iostat=io) l
+      if (io == 0) then
+        if (allocated(lay)) deallocate (lay)
+        call get_value(table,key,val,stat=io2)
+        !> if a command was specified, save it
+        if(io2 == 0)then
+           input%cmd(l) = val
+           write (stdout,'(a,a,i0,a)') ns,'layer ',l,' subprocess command set to:'
+           write (stdout,'(a,a )') repeat(' ',len(ns)),trim(input%cmd(l))
+        endif 
+      end if
+    end do
+
+  end subroutine read_lwoniom_processcmd
+
+
 
 #endif
 !========================================================================================!

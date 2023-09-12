@@ -44,6 +44,8 @@ program lwoniom_app
   integer :: i,j,k,l,io,ich
   logical :: ex,dumpfrags
 
+  character(len=*),parameter :: namespace = 'lwONIOM> '
+
 !=======================================================================================!
 !=======================================================================================!
 !> get cmd and arguments
@@ -137,15 +139,24 @@ program lwoniom_app
 !>--- print some info
     write(stdout,*)
     call dat%info()
+    write(stdout,*)
 
 !>--- dump xyz fragments
     if (dumpfrags) then
+      write(stdout,'(a,a)') namespace,'dumping all fragments ...'
+      do i=1,dat%nfrag
+       write(stdout,'(1x,a,i0,a)',advance='no') 'fragment.',i,'.xyz'
+      enddo
+      write(stdout,*)
       call dat%dump_fragments()
     end if
 
 
 
   end if
+
+!=======================================================================================!
+  write(stdout,'(/,a,a)') namespace,'normal termination.'
 !=======================================================================================!
 !=======================================================================================!
 end program lwoniom_app

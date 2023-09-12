@@ -36,19 +36,22 @@ contains  !> MODULE PROCEDURES START HERE
 !========================================================================================!
 
   subroutine lwoniom_singlepoint(nat,dat,energy,gradient,verbose,iostat)
+!*************************************************
+!* Obtain the MC-ONIOM gradient from dat.
+!* The high- and low-level energies and gradients
+!* for each fragment must be known at this point
+!*************************************************
     implicit none
     !> INPUT
-    integer,intent(in)  :: nat        !> number of atoms
-    !integer,intent(in)  :: at(nat)    !> atom types
-    !real(wp),intent(in) :: xyz(3,nat) !> Cartesian coordinates in Bohr
+    integer,intent(in)  :: nat                 !> number of atoms in the original system
     logical,intent(in),optional    :: verbose  !> printout activation
-    type(lwoniom_data),intent(inout) :: dat  !> collection of lwoniom datatypes and settings
+    type(lwoniom_data),intent(inout) :: dat    !> collection of lwoniom datatypes and settings
     !> OUTPUT
     real(wp),intent(out) :: energy
     real(wp),intent(out) :: gradient(3,nat)
     integer,intent(out),optional  :: iostat
     !> LOCAL
-    integer :: io,i,j,k,kk
+    integer :: io,i,j,k,kk,root_id
     integer :: nchilds
     logical :: pr
 
@@ -63,53 +66,14 @@ contains  !> MODULE PROCEDURES START HERE
     gradient(:,:) = 0.0_wp
     io = 0
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! TODO do the ONIOM energy and gradient reconstruction here
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !> Loop through layers, starting from the 2nd lowest (highest number)
-    do i = dat%nlayer-1,1,-1
-
-      !> check for fragments belonging to this layer
-      do j = 1,dat%nfrag
-        if (dat%fragment(j)%layer == i) then
-
-          if (.not.allocated(dat%fragment(j)%gradient_qq)) then
-            allocate (dat%fragment(j)%gradient_qq(3,nat))
-          end if
-          dat%fragment(j)%energy_qq = 0.0d0
-          dat%fragment(j)%gradient_qq = 0.0d0
-
-          !> if so, check for children fragments
-          if (allocated(dat%fragment(j)%child)) then
-            nchilds = size(dat%fragment(j)%child(:),1)
-            !> loop over all children nodes
-            do k = 1,nchilds
-              kk = dat%fragment(j)%child(k)
-
-              if (allocated(dat%fragment(kk)%gradient_qq)) then
-                dat%fragment(j)%energy_qq = dat%fragment(kk)%energy_qq &
-                &                           -dat%fragment(kk)%energy_low
-                dat%fragment(j)%gradient_qq(:,:) = dat%fragment(kk)%gradient_qq(:,:) &
-                &                                  -dat%fragment(kk)%gradient_low(:,:)
-              else
-                dat%fragment(j)%energy_qq = dat%fragment(kk)%energy_high &
-                &                           -dat%fragment(kk)%energy_low
-                dat%fragment(j)%gradient_qq(:,:) = dat%fragment(kk)%gradient_high(:,:) &
-                &                                  -dat%fragment(kk)%gradient_low(:,:)
-              end if
-
-            end do
-
-            !> add "high" level of parent node (which must be the same level of theory
-            !> as the children node's low level)
-            dat%fragment(j)%energy_qq = dat%fragment(j)%energy_qq+dat%fragment(j)%energy_high
-            dat%fragment(j)%gradient_qq(:,:) = dat%fragment(j)%gradient_qq(:,:) &
-            &                                  +dat%fragment(j)%gradient_high(:,:)
-          end if
-        end if
-      end do
-
-    end do
+    !> The energy and gradient reconstruction is done by calling the
+    !> recursive engrad_recursion subroutine.
+    !> We start at the root node (layer 1), and  the recursion terminates
+    !> if a subsystem hasn't any child nodes
+    root_id = dat%root_id
+    call engrad_recursion(dat,root_id,nat)
+    energy = dat%fragment(root_id)%energy_qq
+    gradient(:,:) = dat%fragment(root_id)%gradient_qq
 
     if (present(iostat)) then
       iostat = io
@@ -123,15 +87,15 @@ contains  !> MODULE PROCEDURES START HERE
 !*********************************************************************
 !* Recursion construction of the MC-ONIOM energy and gradient.
 !* The energy (or gradient) of the current node F_i is calculated as:
-!*  
-!*   F_i = F_i^h + ∑_j(f_j - f_j^l)
+!*
+!*   F_i = F_i^h + ∑_j(F_j - F_j^l)
 !*
 !* where F_i^h is the high-level energy/gradient.
-!* To this, (corrected) energy/gradient contibutions of all 
-!* children nodes f_j, minus their low-level contibution f_j^l.
+!* To this, (corrected) energy/gradient contibutions of all
+!* children nodes F_j, minus their low-level contibution F_j^l.
 !* Keep in mind that the high-level of the parent node (F_i^h) refers
-!* to the same as the low-level of the child node (f_j^l).
-!* f_j is itself calculated by the same equation as F_i, which is where
+!* to the same as the low-level of the child node (F_j^l).
+!* F_j is itself calculated by the same equation as F_i, which is where
 !* the recursion comes into play. The recusion terminates when
 !* there are no child nodes. In this case F_i = F_i^h.
 !*********************************************************************
