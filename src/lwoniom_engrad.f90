@@ -88,23 +88,23 @@ contains  !> MODULE PROCEDURES START HERE
 
               if (allocated(dat%fragment(kk)%gradient_qq)) then
                 dat%fragment(j)%energy_qq = dat%fragment(kk)%energy_qq &
-                &                           - dat%fragment(kk)%energy_low
-                dat%fragment(j)%gradient_qq(:,:) = dat%fragment(kk)%gradient_qq(:,:) & 
-                &                                  - dat%fragment(kk)%gradient_low(:,:)
+                &                           -dat%fragment(kk)%energy_low
+                dat%fragment(j)%gradient_qq(:,:) = dat%fragment(kk)%gradient_qq(:,:) &
+                &                                  -dat%fragment(kk)%gradient_low(:,:)
               else
                 dat%fragment(j)%energy_qq = dat%fragment(kk)%energy_high &
-                &                           - dat%fragment(kk)%energy_low
+                &                           -dat%fragment(kk)%energy_low
                 dat%fragment(j)%gradient_qq(:,:) = dat%fragment(kk)%gradient_high(:,:) &
-                &                                  - dat%fragment(kk)%gradient_low(:,:)
+                &                                  -dat%fragment(kk)%gradient_low(:,:)
               end if
 
             end do
- 
+
             !> add "high" level of parent node (which must be the same level of theory
             !> as the children node's low level)
-            dat%fragment(j)%energy_qq  = dat%fragment(j)%energy_qq  + dat%fragment(j)%energy_high 
+            dat%fragment(j)%energy_qq = dat%fragment(j)%energy_qq+dat%fragment(j)%energy_high
             dat%fragment(j)%gradient_qq(:,:) = dat%fragment(j)%gradient_qq(:,:) &
-            &                                  + dat%fragment(j)%gradient_high(:,:) 
+            &                                  +dat%fragment(j)%gradient_high(:,:)
           end if
         end if
       end do
@@ -116,6 +116,60 @@ contains  !> MODULE PROCEDURES START HERE
     end if
 
   end subroutine lwoniom_singlepoint
+
+!========================================================================================!
+
+  recursive subroutine engrad_recursion(dat,F,nat)
+!*********************************************************************
+!* Recursion construction of the MC-ONIOM energy and gradient.
+!* The energy (or gradient) of the current node F_i is calculated as:
+!*  
+!*   F_i = F_i^h + ∑_j(f_j - f_j^l)
+!*
+!* where F_i^h is the high-level energy/gradient.
+!* To this, (corrected) energy/gradient contibutions of all 
+!* children nodes f_j, minus their low-level contibution f_j^l.
+!* Keep in mind that the high-level of the parent node (F_i^h) refers
+!* to the same as the low-level of the child node (f_j^l).
+!* f_j is itself calculated by the same equation as F_i, which is where
+!* the recursion comes into play. The recusion terminates when
+!* there are no child nodes. In this case F_i = F_i^h.
+!*********************************************************************
+    implicit none
+    type(lwoniom_data),intent(inout) :: dat
+    integer,intent(in) :: F
+    integer,intent(in) :: nat
+    integer :: nchilds,k,KK
+
+    if (.not.allocated(dat%fragment(F)%gradient_qq)) then
+      allocate (dat%fragment(F)%gradient_qq(3,nat))
+    end if
+    dat%fragment(F)%energy_qq = dat%fragment(F)%energy_high
+    dat%fragment(F)%gradient_qq(:,:) = dat%fragment(F)%gradient_high(:,:)
+
+    !> loop over all children nodes
+    if (allocated(dat%fragment(F)%child)) then
+      nchilds = size(dat%fragment(F)%child(:),1)
+      do k = 1,nchilds
+        KK = dat%fragment(F)%child(k) !> the child-node ID
+        !==============================================!
+        call engrad_recursion(dat,KK,nat) !> RECURSION
+        !==============================================!
+
+        dat%fragment(F)%energy_qq = dat%fragment(F)%energy_qq+ &
+        &  dat%fragment(KK)%energy_qq-dat%fragment(KK)%energy_low
+
+        dat%fragment(F)%gradient_qq(:,:) = dat%fragment(F)%gradient_qq(:,:)+ &
+        & dat%fragment(KK)%gradient_qq(:,:)-dat%fragment(kk)%gradient_low(:,:)
+
+      end do
+    else
+      !> RECURSION TERMINATION: NO FURTHER CHILDREN NODES
+      !> i.e., we take energy_qq/gradient_qq for this node 'as is'
+      return
+    end if
+
+  end subroutine engrad_recursion
 
 !========================================================================================!
 !========================================================================================!

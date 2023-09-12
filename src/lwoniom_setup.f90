@@ -47,6 +47,8 @@ module lwoniom_setup
     integer :: nfrag = 0
     !> list of fragments (subsystems)
     type(structure_data),allocatable :: fragment(:)
+    !> root fragment id (the original system)
+    integer :: root_id = 0
 
     !> further system information
     integer,allocatable :: bond(:,:)
@@ -94,6 +96,8 @@ contains  !> MODULE PROCEDURES START HERE
             write (myunit,'(4x,a,i0)',advance='no') '-> fragment ',self%fragment(j)%id
             if (self%fragment(j)%parent .ne. 0) then
               write (myunit,'(1x,a,i0)') ', substructure of fragment ',self%fragment(j)%parent
+            else if(self%root_id == j) then
+              write (myunit,*) '(root)'
             else
               write (myunit,*)
             end if
@@ -144,7 +148,7 @@ contains  !> MODULE PROCEDURES START HERE
     integer :: ich,io,myunit
     logical :: ex,okbas,pr,pr2
     logical :: exitRun
-    integer :: maxf
+    integer :: maxf,nroot
     integer,allocatable ::   indexf(:),parent(:)
     integer :: i,j,k
 
@@ -169,7 +173,7 @@ contains  !> MODULE PROCEDURES START HERE
     end if
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! ROUTINE CONTENT GOES FROM HERE
+! SUBSYTEM SETUP
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     allocate (subsystem_tmp(nat),layer_tmp(nat),source=0)
     if (present(subsystem)) then
@@ -198,6 +202,12 @@ contains  !> MODULE PROCEDURES START HERE
       write (stderr,'(a)') "**ERROR** 'bond' array not provided in call to "//source
       error stop
     end if
+    nroot = count(parent(:).eq.0,1)
+    if(nroot .ne. 1)then
+      write (stderr,'(a,i0)') "**ERROR** incorrect number of parent fragments ",nroot
+      error stop
+    endif
+
 
     !> go through all the fragments, create structure_data and put
     !> them into the fragment list
@@ -211,6 +221,8 @@ contains  !> MODULE PROCEDURES START HERE
       if (parent(i) .ne. 0) then
         j = parent(i)
         call dat%fragment(j)%add_child(dat%fragment(i))
+      else
+        dat%root_id = i
       end if
     end do
 
@@ -482,7 +494,6 @@ contains  !> MODULE PROCEDURES START HERE
         end do
       end do
     end do
-
   end subroutine construct_tree_ONIOM_multicenter
 
 !========================================================================================!

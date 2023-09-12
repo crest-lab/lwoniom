@@ -45,7 +45,7 @@ module lwoniom_structures
     integer :: truenat
     real(wp),allocatable :: gradient_high(:,:) !> gradient in the original system's dimension
     real(wp),allocatable :: gradient_low(:,:)  !> gradient in the original system's dimension
-    real(wp),allocatable :: gradient_qq(:,:) 
+    real(wp),allocatable :: gradient_qq(:,:)
     !> projected via Jacobian
     real(wp),allocatable :: Jaco(:,:)
 
@@ -84,27 +84,27 @@ module lwoniom_structures
   end type structure_data
 !**************************************************************************!
 
-    !>--- Element symbols
+  !>--- Element symbols
 !&<
-    character(len=2),parameter :: PSE(118) = [ &
-   & 'H ',                                                                                'He', &
-   & 'Li','Be',                                                  'B ','C ','N ','O ','F ','Ne', &
-   & 'Na','Mg',                                                  'Al','Si','P ','S ','Cl','Ar', &
-   & 'K ','Ca','Sc','Ti','V ','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr', &
-   & 'Rb','Sr','Y ','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I ','Xe', &
-   & 'Cs','Ba','La',                                                                            &
-   &                'Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu',      &
-   &                'Hf','Ta','W ','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn', &
-   & 'Fr','Ra','Ac',                                                                            &
-   &                'Th','Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr',      &
-   &                'Rf','Db','Sg','Bh','Hs','Mt','Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og' ]
+  character(len=2),parameter :: PSE(118) = [ &
+ & 'H ',                                                                                'He', &
+ & 'Li','Be',                                                  'B ','C ','N ','O ','F ','Ne', &
+ & 'Na','Mg',                                                  'Al','Si','P ','S ','Cl','Ar', &
+ & 'K ','Ca','Sc','Ti','V ','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr', &
+ & 'Rb','Sr','Y ','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I ','Xe', &
+ & 'Cs','Ba','La',                                                                            &
+ &                'Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu',      &
+ &                'Hf','Ta','W ','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn', &
+ & 'Fr','Ra','Ac',                                                                            &
+ &                'Th','Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr',      &
+ &                'Rf','Db','Sg','Bh','Hs','Mt','Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og' ]
 
-    real(wp),parameter :: bohr = 0.52917726_wp
-    real(wp),parameter :: angstrom = 1.0_wp / bohr
-    real(wp),parameter :: autoaa = bohr
-    real(wp),parameter :: aatoau = angstrom
+  real(wp),parameter :: bohr = 0.52917726_wp
+  real(wp),parameter :: angstrom = 1.0_wp / bohr
+  real(wp),parameter :: autoaa = bohr
+  real(wp),parameter :: aatoau = angstrom
 !&>
-    public :: zsym_to_at,lowercase
+  public :: zsym_to_at,lowercase
 
 !========================================================================================!
 !========================================================================================!
@@ -265,29 +265,31 @@ contains  !> MODULE PROCEDURES START HERE
     !> determine the total number of atoms in fragment
     fragnat = self%nat+self%nlink
 
-    if (allocated(self%grd_high)) then
-      !> combine atoms and linkatoms into a single gradient
-      !> for both high and low levels
-      allocate (g_high(3,fragnat),source=0.0d0)
+    if (fragnat < truenat) then
+      if (allocated(self%grd_high)) then
+        !> combine atoms and linkatoms into a single gradient
+        !> for both high and low levels
+        allocate (g_high(3,fragnat),source=0.0d0)
 
-      g_high(:,1:self%nat) = self%grd_high(:,:)
-      g_high(:,self%nat+1:) = self%linkgrd_high(:,:)
+        g_high(:,1:self%nat) = self%grd_high(:,:)
+        g_high(:,self%nat+1:) = self%linkgrd_high(:,:)
 
-      !> allocate and call project_gradient for high level
-      if (.not.allocated(self%gradient_high)) allocate (self%gradient_high(3,truenat))
-      call project_gradient(self,fragnat,g_high,truenat,self%gradient_high)
-    end if
+        !> allocate and call project_gradient for high level
+        if (.not.allocated(self%gradient_high)) allocate (self%gradient_high(3,truenat))
+        call project_gradient(self,fragnat,g_high,truenat,self%gradient_high)
+      end if
 
-    if (allocated(self%grd_low)) then
-      !> combine atoms and linkatoms into a single gradient
-      !> for both high and low levels
-      allocate (g_low(3,fragnat),source=0.0d0)
-      g_low(:,1:self%nat) = self%grd_low(:,:)
-      g_low(:,self%nat+1:) = self%linkgrd_low(:,:)
+      if (allocated(self%grd_low)) then
+        !> combine atoms and linkatoms into a single gradient
+        !> for both high and low levels
+        allocate (g_low(3,fragnat),source=0.0d0)
+        g_low(:,1:self%nat) = self%grd_low(:,:)
+        g_low(:,self%nat+1:) = self%linkgrd_low(:,:)
 
-      !> allocate and call project_gradient for low level
-      if (.not.allocated(self%gradient_low)) allocate (self%gradient_low(3,truenat))
-      call project_gradient(self,fragnat,g_low,truenat,self%gradient_low)
+        !> allocate and call project_gradient for low level
+        if (.not.allocated(self%gradient_low)) allocate (self%gradient_low(3,truenat))
+        call project_gradient(self,fragnat,g_low,truenat,self%gradient_low)
+      end if
     end if
 
     deallocate (g_high)
@@ -437,11 +439,11 @@ contains  !> MODULE PROCEDURES START HERE
 
     n_tot = self%nat+self%nlink
     open (newunit=ich,file=trim(fname))
-    if(present(xyz))then
-    write(ich,*) size(xyz,2)
+    if (present(xyz)) then
+      write (ich,*) size(xyz,2)
     else
-    write (ich,*) n_tot
-    endif
+      write (ich,*) n_tot
+    end if
     write (ich,*)
 
     do i = 1,self%nat
@@ -452,14 +454,14 @@ contains  !> MODULE PROCEDURES START HERE
       write (ich,'(a2,3f16.8)') PSE(self%linkat(i)),self%linkxyz(:,i)*autoaa
     end do
 
-    if(present(xyz))then
-      do i=1,size(xyz,2)
-         if(.not.any(self%opos(:).eq.i) .and. &
-         &  .not.any(self%linkopos(:).eq.i) )then
-       write (ich,'(a2,3f16.8)') 'He',xyz(:,i)*autoaa         
-         endif 
-      enddo
-    endif
+    if (present(xyz)) then
+      do i = 1,size(xyz,2)
+        if (.not.any(self%opos(:) .eq. i).and. &
+        &  .not.any(self%linkopos(:) .eq. i)) then
+          write (ich,'(a2,3f16.8)') 'He',xyz(:,i)*autoaa
+        end if
+      end do
+    end if
 
     close (ich)
   end subroutine dump_fragment
@@ -467,14 +469,14 @@ contains  !> MODULE PROCEDURES START HERE
 !========================================================================================!
 
   function zsym_to_at(zsym) result(at)
-     implicit none
-     character(len=*) :: zsym
-     integer :: at
-     integer :: i,j
-     at = 0
-     do i=1,size(PSE,1)    
-       if(trim(lowercase(zsym)) .eq. trim(lowercase(PSE(i)))) at = i
-     enddo
+    implicit none
+    character(len=*) :: zsym
+    integer :: at
+    integer :: i,j
+    at = 0
+    do i = 1,size(PSE,1)
+      if (trim(lowercase(zsym)) .eq. trim(lowercase(PSE(i)))) at = i
+    end do
   end function zsym_to_at
 
   function lowerCase(s)
