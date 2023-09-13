@@ -108,8 +108,15 @@ contains  !> MODULE PROCEDURES START HERE
     if (.not.allocated(dat%fragment(F)%gradient_qq)) then
       allocate (dat%fragment(F)%gradient_qq(3,nat))
     end if
-    dat%fragment(F)%energy_qq = dat%fragment(F)%energy_high
-    dat%fragment(F)%gradient_qq(:,:) = dat%fragment(F)%gradient_high(:,:)
+    if (allocated(dat%fragment(F)%gradient_high)) then
+      dat%fragment(F)%energy_qq = dat%fragment(F)%energy_high
+      dat%fragment(F)%gradient_qq(:,:) = dat%fragment(F)%gradient_high(:,:)
+    else
+!>--- This fallback condition is implemented for the parent fragment/highest layer
+!>--- which only has a low-level energy/gradient
+      dat%fragment(F)%energy_qq = dat%fragment(F)%energy_low
+      dat%fragment(F)%gradient_qq(:,:) = dat%fragment(F)%gradient_low(:,:)
+    end if
 
     !> loop over all children nodes
     if (allocated(dat%fragment(F)%child)) then

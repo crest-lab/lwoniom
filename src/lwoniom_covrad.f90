@@ -61,7 +61,7 @@ module lwoniom_covrad
 !&>
 
   public :: lwoniom_rcov_bonds
-  public :: link_ratio_g
+  public :: link_ratio_k
 
 !========================================================================================!
 !========================================================================================!
@@ -112,13 +112,13 @@ contains !> MODULE PROCEDURES START HERE
 
 !========================================================================================!
 
-  function link_ratio_g(at_a,at_b,at_l) result(g)
+  function link_ratio_k(at_a,at_b,at_l) result(k)
 !**************************************************
 !* Calculates (rcov_b + rcov_l) / (rcov_a + rcov_b)
 !***************************************************
     implicit none
     integer,intent(in) :: at_a,at_b,at_l  !> atomic number of atoms a,b, and l
-    real(wp) :: g
+    real(wp) :: k
 
     ! Obtain the covalent radii of atoms a, b, and l
     real(wp) :: rcov_a,rcov_b,rcov_l
@@ -127,9 +127,9 @@ contains !> MODULE PROCEDURES START HERE
     rcov_l = covalent_radius(at_l)
 
     ! Calculate the ratio from the covalent radii of the atoms
-    g = (rcov_b+rcov_l)/(rcov_a+rcov_b)
+    k = (rcov_b+rcov_l)/(rcov_a+rcov_b)
 
-  end function link_ratio_g
+  end function link_ratio_k
 !========================================================================================!
 !========================================================================================!
 end module lwoniom_covrad

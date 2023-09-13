@@ -41,9 +41,9 @@ module lwoniom_parse
     character(len=2),allocatable :: zsym(:)
     real(wp),allocatable :: xyz(:,:)
     character(len=:),allocatable :: cmd(:)
-  contains  
-     procedure :: deallocate => deallocate_lwoniom_input  
-     procedure :: parse_xyz => parse_structure_xyz
+  contains
+    procedure :: deallocate => deallocate_lwoniom_input
+    procedure :: parse_xyz => parse_structure_xyz
   end type lwoniom_input
 
 !> printout param
@@ -59,16 +59,16 @@ contains  !> MODULE PROCEDURES START HERE
   subroutine deallocate_lwoniom_input(self)
     implicit none
     class(lwoniom_input) :: self
-    if(allocated(self%structurefile)) deallocate(self%structurefile)
+    if (allocated(self%structurefile)) deallocate (self%structurefile)
     self%nat = 0
     self%maxfragments = 0
     self%maxlayers = 0
-    if(allocated(self%layer)) deallocate(self%layer)
-    if(allocated(self%frag)) deallocate(self%frag)
-    if(allocated(self%wbofile)) deallocate(self%wbofile)
-    if(allocated(self%wbo)) deallocate(self%wbo)
-    if(allocated(self%zsym)) deallocate(self%zsym)
-    if(allocated(self%xyz)) deallocate(self%xyz)
+    if (allocated(self%layer)) deallocate (self%layer)
+    if (allocated(self%frag)) deallocate (self%frag)
+    if (allocated(self%wbofile)) deallocate (self%wbofile)
+    if (allocated(self%wbo)) deallocate (self%wbo)
+    if (allocated(self%zsym)) deallocate (self%zsym)
+    if (allocated(self%xyz)) deallocate (self%xyz)
   end subroutine deallocate_lwoniom_input
 
 !=======================================================================================!
@@ -191,7 +191,6 @@ contains  !> MODULE PROCEDURES START HERE
       call read_lwoniom_layer(error,input,child)
     end if
 
-
     !> then fragment-wise definition of subprocesses to calculate energies and gradients
     !> note: this is only for the app usage
     call get_value(table,'cmd',child,requested=.false.)
@@ -200,10 +199,9 @@ contains  !> MODULE PROCEDURES START HERE
         write (stderr,'("**ERROR** ",a)') 'CMDs must not be defined without defining layers first'
         stop
       end if
-      allocate(input%cmd( input%maxlayers ), source=repeat(" ",200))
+      allocate (input%cmd(input%maxlayers),source=repeat(" ",200))
       call read_lwoniom_processcmd(error,input,child)
     end if
-
 
   end subroutine read_lwoniom_block
 
@@ -311,7 +309,6 @@ contains  !> MODULE PROCEDURES START HERE
 
   end subroutine read_lwoniom_layer
 
-
   subroutine read_lwoniom_processcmd(error,input,table)
 !*******************************************************
 !* Read all process commands
@@ -335,10 +332,10 @@ contains  !> MODULE PROCEDURES START HERE
 
     !> iterate over keys (which should be integer numbers)
     call table%get_keys(list)
-    if(size(list) .ne. input%maxlayers)then
+    if (size(list) .ne. input%maxlayers) then
       write (stderr,'("**ERROR** ",a)') 'Please define a CMD for all layers!'
       error stop
-    endif
+    end if
     do ikey = 1,size(list)
       key = list(ikey)%key
       read (key,*,iostat=io) l
@@ -346,17 +343,15 @@ contains  !> MODULE PROCEDURES START HERE
         if (allocated(lay)) deallocate (lay)
         call get_value(table,key,val,stat=io2)
         !> if a command was specified, save it
-        if(io2 == 0)then
-           input%cmd(l) = val
-           write (stdout,'(a,a,i0,a)') ns,'layer ',l,' subprocess command set to:'
-           write (stdout,'(a,a )') repeat(' ',len(ns)),trim(input%cmd(l))
-        endif 
+        if (io2 == 0) then
+          input%cmd(l) = val
+          write (stdout,'(a,a,i0,a)') ns,'layer ',l,' subprocess command set to:'
+          write (stdout,'(a,a )') repeat(' ',len(ns)),trim(input%cmd(l))
+        end if
       end if
     end do
 
   end subroutine read_lwoniom_processcmd
-
-
 
 #endif
 !========================================================================================!
@@ -441,7 +436,7 @@ contains  !> MODULE PROCEDURES START HERE
       end do
       close (ich)
     else
-      write(stderr,'(a)') '**ERROR** Input file '//trim(fname)//' does not exist'
+      write (stderr,'(a)') '**ERROR** Input file '//trim(fname)//' does not exist'
     end if
   end subroutine read_xyz
 
@@ -453,8 +448,8 @@ contains  !> MODULE PROCEDURES START HERE
     character(len=*),intent(in) :: fname
     integer :: tmpnat
     input%structurefile = fname
-    call read_xyz(input%structurefile,tmpnat,input%zsym,input%xyz) 
-    if(input%nat == 0 ) input%nat = tmpnat
+    call read_xyz(input%structurefile,tmpnat,input%zsym,input%xyz)
+    if (input%nat == 0) input%nat = tmpnat
   end subroutine parse_structure_xyz
 
 !========================================================================================!

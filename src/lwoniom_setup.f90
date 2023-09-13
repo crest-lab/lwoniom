@@ -37,8 +37,6 @@ module lwoniom_setup
 !> data required for a lwONIOM calculation
   type :: lwoniom_data
 
-    real(wp) :: lwoniom_energy
-
     !> number of layers
     integer :: nlayer = 0
     integer,allocatable :: layer(:)
@@ -59,6 +57,7 @@ module lwoniom_setup
     procedure :: deallocate => lwoniom_data_deallocate
     procedure :: add_fragment => lwoniom_add_fragment
     procedure :: dump_fragments => lwoniom_dump_fragments
+    procedure :: update => lwoniom_update_fragments
   end type lwoniom_data
 !************************************************************!
 
@@ -68,7 +67,6 @@ contains  !> MODULE PROCEDURES START HERE
 !========================================================================================!
 !========================================================================================!
 
-!========================================================================================!
   subroutine print_lwoniom_info(self,iunit)
     class(lwoniom_data) :: self
     integer,intent(in),optional :: iunit ! file handle (usually output_unit=6)
@@ -96,7 +94,7 @@ contains  !> MODULE PROCEDURES START HERE
             write (myunit,'(4x,a,i0)',advance='no') '-> fragment ',self%fragment(j)%id
             if (self%fragment(j)%parent .ne. 0) then
               write (myunit,'(1x,a,i0)') ', substructure of fragment ',self%fragment(j)%parent
-            else if(self%root_id == j) then
+            else if (self%root_id == j) then
               write (myunit,*) '(root)'
             else
               write (myunit,*)
@@ -125,6 +123,7 @@ contains  !> MODULE PROCEDURES START HERE
 !*     one layer can have mutliple fragments (MC-ONIOM).
 !*     However, the array "bond" must also be present in this case
 !*
+!* This routine needs calling only once, at the beginning
 !******************************************************************
     character(len=*),parameter :: source = 'lwoniom_initialize'
     !> INPUT
@@ -202,12 +201,11 @@ contains  !> MODULE PROCEDURES START HERE
       write (stderr,'(a)') "**ERROR** 'bond' array not provided in call to "//source
       error stop
     end if
-    nroot = count(parent(:).eq.0,1)
-    if(nroot .ne. 1)then
+    nroot = count(parent(:) .eq. 0,1)
+    if (nroot .ne. 1) then
       write (stderr,'(a,i0)') "**ERROR** incorrect number of parent fragments ",nroot
       error stop
-    endif
-
+    end if
 
     !> go through all the fragments, create structure_data and put
     !> them into the fragment list
@@ -335,7 +333,6 @@ contains  !> MODULE PROCEDURES START HERE
 !*****************************************************
     implicit none
     class(lwoniom_data) :: self
-    self%lwoniom_energy = 0.0_Wp
     self%nlayer = 0
     self%nfrag = 0
     if (allocated(self%fragment)) deallocate (self%fragment)
@@ -544,9 +541,9 @@ contains  !> MODULE PROCEDURES START HERE
     allocate (frag%opos(natf),source=0)
     allocate (frag%at(natf),source=0)
     allocate (frag%xyz(3,natf),source=0.0_wp)
-    if(frag%layer /= 1)then
+    if (frag%layer /= 1) then
       allocate (frag%grd_high(3,natf),source=0.0_wp)
-    endif
+    end if
     allocate (frag%grd_low(3,natf),source=0.0_wp)
 
     n = 0
@@ -629,9 +626,9 @@ contains  !> MODULE PROCEDURES START HERE
     allocate (frag%opos(natf),source=0)
     allocate (frag%at(natf),source=0)
     allocate (frag%xyz(3,natf),source=0.0_wp)
-    if(frag%layer /= 1)then
+    if (frag%layer /= 1) then
       allocate (frag%grd_high(3,natf),source=0.0_wp)
-    endif
+    end if
     allocate (frag%grd_low(3,natf),source=0.0_wp)
 
     n = 0
@@ -661,6 +658,23 @@ contains  !> MODULE PROCEDURES START HERE
       call self%fragment(i)%dump_fragment(xyz)
     end do
   end subroutine lwoniom_dump_fragments
+
+!========================================================================================!
+  subroutine lwoniom_update_fragments(self,xyz,pc)
+!*********************************
+!* The geometry on all fragments.
+!* Optionally, also point charges
+!*********************************
+    implicit none
+    class(lwoniom_data) :: self
+    real(wp),intent(in) :: xyz(:,:)
+    real(wp),intent(in),optional :: pc(:)
+    integer :: i,nat
+    nat = size(xyz,2)
+    do i = 1,self%nfrag
+      call self%fragment(i)%update(nat,xyz,pc)
+    end do
+  end subroutine lwoniom_update_fragments
 
 !========================================================================================!
 end module lwoniom_setup
