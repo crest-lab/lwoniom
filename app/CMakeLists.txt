@@ -7,4 +7,4 @@ list(APPEND srcs3
   "${dir}/main.f90"
 )
 
-set(srcs2 ${srcs2} PARENT_SCOPE)
+set(srcs3 ${srcs3} PARENT_SCOPE)

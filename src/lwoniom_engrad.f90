@@ -105,6 +105,7 @@ contains  !> MODULE PROCEDURES START HERE
     integer,intent(in) :: nat
     integer :: nchilds,k,KK
 
+    !write(*,*) 'Constructing ONIOM energy and gradient for fragment',F
     if (.not.allocated(dat%fragment(F)%gradient_qq)) then
       allocate (dat%fragment(F)%gradient_qq(3,nat))
     end if

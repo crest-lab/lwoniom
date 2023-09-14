@@ -41,7 +41,9 @@ program lwoniom_main_tester
   integer :: io
   type(lwoniom_data) :: dat
   integer,allocatable :: layer(:)
-
+  character(len=*),parameter :: green = char(27)//'[92m'
+  character(len=*),parameter :: red = char(27)//'[91m'
+  character(len=*),parameter :: escape = char(27)//'[0m'
 !========================================================================================!
   fail = .false.
   pr = .true.
@@ -109,15 +111,32 @@ program lwoniom_main_tester
      write(stdout,'(a)') 'done.'
   enddo
 
-  write(stdout,*) 'Reconstructing the full "ONIOM5" gradient ... ' 
-
-
+  write(stdout,'(1x,a)',advance='no') 'Reconstructing the full "ONIOM5" gradient ...' 
+  flush(stdout)
+  call lwoniom_singlepoint(nat,dat,energy,gradient)
+  !write(stdout,'(1x,a,f25.15)') 'energy: ',energy
+  !write(stdout,'(1x,a)') 'gradient:'
+  !do i=1,nat
+  !  write(stdout,'(3f25.15)') gradient(1:3,i)
+  !enddo
+  write(stdout,*) 'done.'
+  allocate(refgrad(3,nat), source=1.0d0)
+  fail = any(abs(refgrad(:,:) - gradient(:,:)).gt.1.0d-10)
   call dat%deallocate()
   write (*,*)
   write (*,*) '========================= END ============================='
   write (*,*) '==================== lwONIOM TEST ========================='
   write (*,*) '========================= END ============================='
 
+  write(stdout,*)
+  write(stdout,'(a)',advance='no') '=> All tests passed:  '
+  flush(stdout)
+  if(fail)then
+    write(stdout,*) red,'no!',escape
+  else
+    write(stdout,*) green,'yes!',escape
+  endif
+  write(stdout,*)
 !=======================================================================================!
   deallocate (gradient)
   deallocate (xyz,at)

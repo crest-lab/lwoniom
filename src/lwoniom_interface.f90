@@ -30,6 +30,7 @@ module lwoniom_interface
 !> RE-exports
   public :: lwoniom_input,lwoniom_parse_inputfile
   public :: lwoniom_data,lwoniom_initialize
+  public :: lwoniom_singlepoint
 
 !> interface routines
   public :: lwoniom_new_calculator
