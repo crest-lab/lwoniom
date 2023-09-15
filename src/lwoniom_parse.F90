@@ -30,6 +30,7 @@ module lwoniom_parse
 !> storage type for input
   public :: lwoniom_input
   type :: lwoniom_input
+    logical :: read_input = .false.
     character(len=:),allocatable :: structurefile
     integer :: nat = 0
     integer :: maxfragments = 0
@@ -39,6 +40,7 @@ module lwoniom_parse
     character(len=:),allocatable :: wbofile
     real(wp),allocatable :: wbo(:,:)
     character(len=2),allocatable :: zsym(:)
+    integer,allocatable :: at(:)
     real(wp),allocatable :: xyz(:,:)
     character(len=:),allocatable :: cmd(:)
   contains
@@ -73,10 +75,12 @@ contains  !> MODULE PROCEDURES START HERE
 
 !=======================================================================================!
 
-  subroutine lwoniom_parse_inputfile(tomlfile,input)
+  subroutine lwoniom_parse_inputfile(tomlfile,input,required,natoms)
     implicit none
     character(len=*),intent(in)     :: tomlfile
     type(lwoniom_input),intent(out) :: input
+    logical,intent(in),optional :: required
+    integer,intent(in),optional :: natoms
 #ifndef WITH_TOMLF
     write (stderr,*) "**ERROR** lwONIOM was compiled without TOML-f support. "// &
     & "To enable the parser, set up the build with -DWITH_TOMLF=true"
@@ -86,14 +90,19 @@ contains  !> MODULE PROCEDURES START HERE
     type(toml_table),allocatable       :: table
     type(toml_error),allocatable       :: error
     type(toml_table),pointer :: child
-    logical :: ex
+    logical :: ex,req
+
+    req = .true.
+    if(present(required))then
+       req = required
+    endif
 
     inquire (file=tomlfile,exist=ex)
     if (.not.ex) then
       write (stderr,'("**ERROR** ",a,a,a)') "input file ",trim(tomlfile)," not found!"
       return
     end if
-    write (stdout,'(a,a,a)') ns,"reading input file ",trim(tomlfile)
+    if(req) write (stdout,'(a,a,a)') ns,"reading input file ",trim(tomlfile)
 
     !> the actual "reading" part
     open (newunit=io,file=tomlfile)
@@ -106,10 +115,14 @@ contains  !> MODULE PROCEDURES START HERE
     !> look for [lwoniom] block
     call get_value(table,"lwoniom",child,requested=.false.)
     if (.not.associated(child)) then
-      write (stderr,'("**ERROR** ",a,a)') "No [lwoniom] section found in input file ",trim(tomlfile)
+      if(req) write (stderr,'("**ERROR** ",a,a)') "No [lwoniom] section found in input file ",trim(tomlfile)
+      if (allocated(error)) deallocate (error)
+      if (allocated(table)) deallocate (table)
       return
     end if
-    call read_lwoniom_block(error,input,child)
+    input%read_input = .true.
+    write (stdout,'(/,a,a,a)') ns,'parsing [lwoniom]-block from file ',trim(tomlfile)
+    call read_lwoniom_block(error,input,child,natoms)
 
     if (allocated(error)) deallocate (error)
     if (allocated(table)) deallocate (table)
@@ -119,7 +132,7 @@ contains  !> MODULE PROCEDURES START HERE
 !========================================================================================!
 
 #ifdef WITH_TOMLF
-  subroutine read_lwoniom_block(error,input,table)
+  subroutine read_lwoniom_block(error,input,table,natoms)
 !***************************************************
 !* Reader for [lwoniom] block in toml file
 !***************************************************
@@ -129,6 +142,7 @@ contains  !> MODULE PROCEDURES START HERE
     type(lwoniom_input),intent(out) :: input
     !> Data structure
     type(toml_table),intent(inout) :: table
+    integer,intent(in),optional :: natoms
     type(toml_table),pointer :: child
     integer :: io,i,j,k,l,tmpnat
     integer :: ikey
@@ -138,9 +152,11 @@ contains  !> MODULE PROCEDURES START HERE
 
     !> first get total number of atoms and allocate
     call get_value(table,"natoms",input%nat,stat=io)
-    if (io /= toml_stat%success) then
+    if (io /= toml_stat%success .and. .not.present(natoms)) then
       write (stderr,'("**ERROR** ",a)') "Please provide the total number of atoms (natoms) in [lwoniom] block"
       return
+    else if( present(natoms))then
+       input%nat = natoms
     end if
     allocate (input%layer(input%nat),source=0)
     allocate (input%frag(input%nat),source=0)

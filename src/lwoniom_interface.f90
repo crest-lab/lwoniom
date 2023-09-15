@@ -61,13 +61,21 @@ contains  !> MODULE PROCEDURES START HERE
     integer,allocatable :: at(:),bond(:,:)
     logical :: ex
 
-    if (allocated(inp%xyz).and.allocated(inp%zsym).and. &
+    if (allocated(inp%xyz).and. &
         allocated(inp%layer).and.allocated(inp%frag)) then
 
       allocate (at(inp%nat),source=0)
+      if(allocated(inp%zsym))then
       do i = 1,inp%nat
         at(i) = zsym_to_at(inp%zsym(i))
       end do
+      else if(allocated(inp%at))then
+        at = inp%at
+      else
+        write (stderr,'("**ERROR** ",a)') "Required lwoniom_input atom type info missing!"
+        error stop
+      endif
+
 
       if (.not.allocated(inp%wbo)) then
         !> without bonding topology (will be set up from covalent radii)
@@ -86,6 +94,7 @@ contains  !> MODULE PROCEDURES START HERE
         &                 inp%layer,inp%frag,bond)
 
       end if
+      deallocate(at)
     else
       write (stderr,'("**ERROR** ",a)') "Required lwoniom_input setup info missing!"
       return
