@@ -52,6 +52,10 @@ module lwoniom_setup
     integer,allocatable :: bond(:,:)
     integer,allocatable :: indexf(:)
 
+    !> calculation mapping
+    integer :: ncalcs !> total number of required calculations
+    integer,allocatable :: calcids(:,:)  !> high (1,:) and low (2,:) level IDs for each fragment
+
   contains
     procedure :: info => print_lwoniom_info
     procedure :: deallocate => lwoniom_data_deallocate

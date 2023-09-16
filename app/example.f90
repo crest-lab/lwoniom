@@ -150,6 +150,13 @@ contains !> MODULE PROCEDURES START HERE
     write (ich,'(a)') 'layer.1 = [1]  # layer 1 contains only fragment 1'
     write (ich,'(a)') 'layer.2 = [2]  # layer 2 contains only fragment 2'
 
+    write (ich,*)
+    write (ich,'(a)') '# For application in other programs it is typically necessary to'
+    write (ich,'(a)') '# tie each layer to a calculation level or some ID'
+    write (ich,'(a)') 'layerlayer.1 = 1  # tie layer 1 to ID 1'
+    write (ich,'(a)') 'layerlevel.2 = 2  # tie layer 2 to ID 2'
+ 
+
     close (ich)
   end subroutine write_example_toml
 

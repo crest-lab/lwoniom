@@ -43,6 +43,7 @@ module lwoniom_parse
     integer,allocatable :: at(:)
     real(wp),allocatable :: xyz(:,:)
     character(len=:),allocatable :: cmd(:)
+    integer,allocatable :: layerlvl(:)
   contains
     procedure :: deallocate => deallocate_lwoniom_input
     procedure :: parse_xyz => parse_structure_xyz
@@ -196,15 +197,29 @@ contains  !> MODULE PROCEDURES START HERE
       call read_lwoniom_fragment(error,input,child)
     end if
 
+    !> lwONIOM MUST have fragment information
+    if (input%maxfragments < 1) then
+        write (stderr,'("**ERROR** ",a)') 'lwONIOM requires definition of fragments!'
+        error stop
+    end if
+
+
     !> then fragment-wise definition of layers (= which fragment belongs to which layer)
     !> note: input%layer is still stored atom-wise!
     call get_value(table,'layer',child,requested=.false.)
     if (associated(child)) then
-      if (input%maxfragments < 1) then
-        write (stderr,'("**ERROR** ",a)') 'Layers must not be defined without defining fragments first'
-        stop
-      end if
       call read_lwoniom_layer(error,input,child)
+    else
+    !> If not present, each fragment is assumed to be a layer on its own (FALLBACK)
+       write(stdout,'(a,a)') ns,'No layer information provided; assuming fragments to be layers'
+       input%maxlayers = input%maxfragments
+       if(.not.allocated(input%layer)) allocate(input%layer( input%nat  )) 
+       do i=1,input%maxfragments
+         write(stdout,'(a,a)') clears,'fragment ',i,' --> layer ',i
+         do j=1,input%nat
+            if(input%frag(j) == i) input%layer(j) = i
+         enddo
+       enddo
     end if
 
     !> then fragment-wise definition of subprocesses to calculate energies and gradients
@@ -218,6 +233,18 @@ contains  !> MODULE PROCEDURES START HERE
       allocate (input%cmd(input%maxlayers),source=repeat(" ",200))
       call read_lwoniom_processcmd(error,input,child)
     end if
+
+
+    !> then layer-wise definition of calculator IDs
+    call get_value(table,'layerlevel',child,requested=.false.)
+    if (associated(child)) then
+      if (input%maxlayers < 1) then
+        write (stderr,'("**ERROR** ",a)') 'Layer level IDs must not be defined without defining layers first'
+        stop
+      end if
+      call read_lwoniom_layerlvl(error,input,child)
+    end if
+
 
   end subroutine read_lwoniom_block
 
@@ -368,6 +395,52 @@ contains  !> MODULE PROCEDURES START HERE
     end do
 
   end subroutine read_lwoniom_processcmd
+
+  subroutine read_lwoniom_layerlvl(error,input,table)
+!*******************************************************
+!* Read all an id for the level of theory that
+!* Shall be used for each of the layers
+!*******************************************************
+    !> Error handler
+    type(toml_error),allocatable :: error
+    !> Hamiltonian input to be read
+    type(lwoniom_input),intent(inout) :: input
+    !> Data structure
+    type(toml_table),intent(inout) :: table
+    type(toml_table),pointer :: child
+    integer :: io,i,j,k,l,f,io2,io3
+    integer :: ikey
+    type(toml_key),allocatable :: list(:)
+    type(toml_array),pointer    :: arr
+    character(len=:),allocatable :: key
+    integer :: val
+    integer,allocatable :: lay(:)
+    integer :: lvl 
+
+    !> iterate over keys (which should be integer numbers)
+    call table%get_keys(list)
+    if (size(list) .ne. input%maxlayers) then
+      write (stderr,'("**ERROR** ",a)') 'Please define a level ID for ALL layers!'
+      error stop
+    end if
+    if(.not.allocated(input%layerlvl)) allocate(input%layerlvl( input%maxlayers ) )  
+    do ikey = 1,size(list)
+      key = list(ikey)%key
+      read (key,*,iostat=io) l
+      if (io == 0) then
+        if (allocated(lay)) deallocate (lay)
+        call get_value(table,key,val,stat=io2)
+        if (io2 == 0) then  
+          input%layerlvl(l) = val
+          write (stdout,'(a,a,i0,a,i0)') ns,'layer ',l,' associated with calculation level ',val
+        end if
+      end if
+    end do
+
+  end subroutine read_lwoniom_layerlvl
+
+
+
 
 #endif
 !========================================================================================!

@@ -57,7 +57,7 @@ contains  !> MODULE PROCEDURES START HERE
     !> the calculator/data type to be created
     type(lwoniom_data),intent(out) :: dat
     !> LOCAL
-    integer :: i,j,k,l
+    integer :: i,j,k,l,p
     integer,allocatable :: at(:),bond(:,:)
     logical :: ex
 
@@ -95,6 +95,25 @@ contains  !> MODULE PROCEDURES START HERE
 
       end if
       deallocate(at)
+
+
+      !> set up mapping of theory levels
+      if(allocated(inp%layerlvl))then
+         dat%ncalcs = 2*dat%nfrag - 1
+         allocate(dat%calcids(2,dat%nfrag), source = 0)
+         do i=1,dat%nfrag
+           j = dat%fragment(i)%layer
+           dat%calcids(1,i) = inp%layerlvl(j) !> high level
+           p = dat%fragment(i)%parent
+           if(p .ne. 0)then
+             j = dat%fragment(p)%layer
+             dat%calcids(2,i) = inp%layerlvl(j) !> low level, same layer as parent
+           else
+             dat%calcids(2,i) = dat%calcids(1,i) !> highest layer has only one level
+           endif
+         enddo
+       endif
+
     else
       write (stderr,'("**ERROR** ",a)') "Required lwoniom_input setup info missing!"
       return

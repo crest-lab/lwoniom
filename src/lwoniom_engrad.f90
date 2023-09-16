@@ -47,8 +47,8 @@ contains  !> MODULE PROCEDURES START HERE
     logical,intent(in),optional    :: verbose  !> printout activation
     type(lwoniom_data),intent(inout) :: dat    !> collection of lwoniom datatypes and settings
     !> OUTPUT
-    real(wp),intent(out) :: energy
-    real(wp),intent(out) :: gradient(3,nat)
+    real(wp),intent(inout) :: energy
+    real(wp),intent(inout) :: gradient(3,nat)
     integer,intent(out),optional  :: iostat
     !> LOCAL
     integer :: io,i,j,k,kk,root_id
@@ -62,8 +62,6 @@ contains  !> MODULE PROCEDURES START HERE
       pr = .false. !> (there is close to no printout anyways)
     end if
 
-    energy = 0.0_wp
-    gradient(:,:) = 0.0_wp
     io = 0
 
     !> The energy and gradient reconstruction is done by calling the
@@ -72,8 +70,10 @@ contains  !> MODULE PROCEDURES START HERE
     !> if a subsystem hasn't any child nodes
     root_id = dat%root_id
     call engrad_recursion(dat,root_id,nat)
-    energy = dat%fragment(root_id)%energy_qq
-    gradient(:,:) = dat%fragment(root_id)%gradient_qq
+
+    !> additive energy and gradient
+    energy = energy + dat%fragment(root_id)%energy_qq
+    gradient(:,:) = gradient + dat%fragment(root_id)%gradient_qq
 
     if (present(iostat)) then
       iostat = io
