@@ -55,6 +55,7 @@ module lwoniom_structures
     integer  :: nat = 0
     integer,allocatable  :: opos(:)   !> mapping of each atom in the original (topmost) layer
     integer,allocatable  :: at(:)     !> atomic number
+    logical :: replace_at = .false. 
     integer,allocatable  :: at_high(:) 
     integer,allocatable  :: at_low(:)
     real(wp),allocatable :: xyz(:,:)  !> Cartesian coordinates, also atomic units -> Bohr
@@ -207,7 +208,7 @@ contains  !> MODULE PROCEDURES START HERE
     real(wp),allocatable :: Jaco(:,:)
     real(wp) :: Jij(3,3),x
     real(wp),allocatable :: g(:)
-    integer :: m,n,i,j,l,k,i2,i3,i4
+    integer :: m,n,i,j,l,k,i2,i3,i4,ii4
 
 !>--- reset
     truegrd = 0.d0
@@ -236,9 +237,10 @@ contains  !> MODULE PROCEDURES START HERE
             i2 = i-self%nat
             i3 = self%linkopos(i2)
             i4 = self%linksto(i2)
+            ii4 = self%opos(i4)
             if (j == i3) then  !> linkopos
               x = self%link_k(i2)
-            elseif (j == i4) then !> linksto
+            elseif (j == ii4) then !> linksto
               x = 1.0d0-self%link_k(i2)
             else
               x = 0.0d0
@@ -327,7 +329,7 @@ contains  !> MODULE PROCEDURES START HERE
     integer,intent(in) :: truenat
     real(wp),intent(in) :: xyz(3,truenat)
     real(wp),intent(in),optional :: pc(truenat)
-    integer :: i,j,k,l,a
+    integer :: i,j,k,l,a,aa
 
     k = 0
     do i = 1,truenat
@@ -343,7 +345,8 @@ contains  !> MODULE PROCEDURES START HERE
         do j = 1,self%nlink
           if (self%linkopos(j) == i) then
             a = self%linksto(j)
-            self%linkxyz(:,j) = link_position(xyz(:,i),xyz(:,a),self%link_k(j))
+            aa = self%opos(a)
+            self%linkxyz(:,j) = link_position(xyz(:,i),xyz(:,aa),self%link_k(j))
           end if
         end do
       else if (present(pc)) then

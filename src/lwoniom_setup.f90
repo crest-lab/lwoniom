@@ -48,6 +48,8 @@ module lwoniom_setup
     type(structure_data),allocatable :: fragment(:)
     !> root fragment id (the original system)
     integer :: root_id = 0
+    !> replace atom-types in any of the layers?
+    logical :: replace_at = .false. 
 
     !> further system information
     integer,allocatable :: bond(:,:)
@@ -232,7 +234,6 @@ contains  !> MODULE PROCEDURES START HERE
       write (stderr,'(a)') "**ERROR** 'bond' array not provided in call to "//source
       error stop
     end if
-    write(*,*) parent(:)
     nroot = count(parent(:) .eq. 0,1)
     if (nroot .ne. 1) then
       write (stderr,'(a,i0)') "**ERROR** incorrect number of parent fragments ",nroot
