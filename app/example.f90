@@ -143,18 +143,19 @@ contains !> MODULE PROCEDURES START HERE
     write (ich,'(a)') '# An ascending fragment numbering is assumed, i.e., fragment.1 will be the parent system'
     write (ich,'(a)') "fragment.1 = 'all'   # fragment 1 contains all atoms"
     write (ich,'(a)') 'fragment.2 = [1,2]   # fragment 2 contains atoms 1 (Cl) and 2 (Al)'
+    write (ich,'(a)') 'fragment.3 = "29-34" # fragment 3, atom lists can be provided as a string'
     write (ich,*)
     write (ich,'(a)') '# Finally, layers are defined on an by-fragment basis'
     write (ich,'(a)') '# As with the fragments, layers are given in ascending order'
     write (ich,'(a)') '# One layer can contain multiple (non-overlapping) fragments in MC-ONIOM, which is not the case here'
     write (ich,'(a)') 'layer.1 = [1]  # layer 1 contains only fragment 1'
-    write (ich,'(a)') 'layer.2 = [2]  # layer 2 contains only fragment 2'
+    write (ich,'(a)') 'layer.2 = [2,3]  # layer 2 contains only fragments 2 and 3'
 
     write (ich,*)
     write (ich,'(a)') '# For application in other programs it is typically necessary to'
     write (ich,'(a)') '# tie each layer to a calculation level or some ID'
-    write (ich,'(a)') 'layerlayer.1 = 1  # tie layer 1 to ID 1'
-    write (ich,'(a)') 'layerlevel.2 = 2  # tie layer 2 to ID 2'
+    write (ich,'(a)') 'layerlevel.1 = 1  # tie layer 1 to ID 1'
+    write (ich,'(a)') 'layerlevel.2 = 2  # tie layer 2 to ID 2 (fragment 2 and 3)'
  
 
     close (ich)

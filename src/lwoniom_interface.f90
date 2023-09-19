@@ -80,10 +80,10 @@ contains  !> MODULE PROCEDURES START HERE
       if (.not.allocated(inp%wbo)) then
         !> without bonding topology (will be set up from covalent radii)
         call lwoniom_initialize(inp%nat,at,inp%xyz/bohr,dat, &
-        &                 inp%layer)
+        &                 inp%layer,inp%frag)
 
       else
-        !> with user-defined bonding topology
+        !> with user-defined bonding topology, needs to be passed as int
         allocate (bond(inp%nat,inp%nat),source=0)
         do i = 1,inp%nat
           do j = 1,inp%nat

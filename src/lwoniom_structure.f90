@@ -16,6 +16,7 @@
 ! You should have received a copy of the GNU Lesser General Public License
 ! along with lwoniom. If not, see <https://www.gnu.org/licenses/>.
 !================================================================================!
+
 module lwoniom_structures
 !**************************************************************
 !* This module implements the structure_data type.
@@ -24,6 +25,7 @@ module lwoniom_structures
   use iso_fortran_env,only:wp => real64,stdout => output_unit,stderr => error_unit
   implicit none
   private
+  logical,parameter,private :: debug = .false.
 
 !**************************************************************************!
 !> a single structure_data required for a lwONIOM calculation
@@ -53,6 +55,8 @@ module lwoniom_structures
     integer  :: nat = 0
     integer,allocatable  :: opos(:)   !> mapping of each atom in the original (topmost) layer
     integer,allocatable  :: at(:)     !> atomic number
+    integer,allocatable  :: at_high(:) 
+    integer,allocatable  :: at_low(:)
     real(wp),allocatable :: xyz(:,:)  !> Cartesian coordinates, also atomic units -> Bohr
     real(wp),allocatable :: grd_high(:,:)
     real(wp),allocatable :: grd_low(:,:)
@@ -428,38 +432,43 @@ contains  !> MODULE PROCEDURES START HERE
   end subroutine allocating_linking_atoms
 
 !========================================================================================!
-  subroutine set_linking_atoms(self,nat,at,xyz,linking_atoms)
+  subroutine set_linking_atoms(self,m,nat,at,xyz,linking_atoms)
 !********************************************************
 !* linking atoms space allocating
 !*******************************************************
     use lwoniom_covrad
     implicit none
     class(structure_data) :: self
-    integer,intent(in) :: nat
+    integer,intent(in) :: nat,m
     integer,intent(in) :: at(nat)
     integer,intent(in) :: linking_atoms(3,nat)
     real(wp),intent(in) :: xyz(3,nat)
-    integer :: i,k,j,m
+    integer :: i,k,j,jj
 
     !> link atom coordinates
-    m = self%nlink
+    if(debug) write(*,*) 'atomtypes and link factors'
+    self%nlink=m
     do i = 1,m
       k = linking_atoms(1,i)
       self%linkopos(i) = k
       j = linking_atoms(2,i)
+      jj = self%opos(j)
       self%linksto(i) = j
       self%linkat(i) = 1 !> Hydrogen for cuts through single bonds
-      !self%linkat(i) = 2
+      if(debug) self%linkat(i) = 2
       if (linking_atoms(3,i) > 1) then
         !> the linking atom is bound to multiple atoms in the fragment
         !> which means this is a bad setup. We set g to one
         self%link_k(i) = 1.0_wp
       else
         !> the regular case, cuts through single bonds
-        self%link_k(i) = link_ratio_k(at(k),at(j),self%linkat(i))
+        self%link_k(i) = link_ratio_k(at(k),at(jj),self%linkat(i))
+        if(debug)then
+           write(*,*) at(k),at(jj),self%linkat(i),self%link_k(i)
+        endif
       end if
 
-      self%linkxyz(:,i) = link_position(xyz(:,k),xyz(:,j),self%link_k(i))
+      self%linkxyz(:,i) = link_position(xyz(:,k),xyz(:,jj),self%link_k(i))
     end do
 
   end subroutine set_linking_atoms

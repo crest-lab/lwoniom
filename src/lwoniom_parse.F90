@@ -21,6 +21,7 @@ module lwoniom_parse
 #ifdef WITH_TOMLF
   use tomlf
 #endif
+  use lwoniom_structures, only:  zsym_to_at,lowercase
   implicit none
   private
 
@@ -268,6 +269,7 @@ contains  !> MODULE PROCEDURES START HERE
     character(len=:),allocatable :: key
     character(len=:),allocatable :: val
     integer,allocatable :: frag(:)
+    logical,allocatable :: atlist(:)
 
     !> iterate over keys (which should be integer numbers)
     call table%get_keys(list)
@@ -287,8 +289,9 @@ contains  !> MODULE PROCEDURES START HERE
           end do
           call set_fragment(input,f,frag)
 
-          !> otherwise, some string shortcuts can be defined
         else
+        !> otherwise, some string shortcuts can be defined
+
           call get_value(table,key,val,stat=io3)
           if (io3 == 0) then
             select case (val)
@@ -298,6 +301,21 @@ contains  !> MODULE PROCEDURES START HERE
                 frag(i) = i
               end do
               call set_fragment(input,f,frag)
+            case default
+            !> atom list for defining ranges
+
+              call lwoniom_get_atlist( input%nat, atlist, val)
+              k = count(atlist,1)
+              allocate (frag(k))
+              k = 0
+              do i = 1,input%nat
+                if(atlist(i))then
+                  k = k + 1
+                  frag(k) = i
+                endif
+              end do
+              call set_fragment(input,f,frag)
+            
             end select
           end if
         end if
@@ -420,6 +438,7 @@ contains  !> MODULE PROCEDURES START HERE
     !> iterate over keys (which should be integer numbers)
     call table%get_keys(list)
     if (size(list) .ne. input%maxlayers) then
+      write(*,*) size(list),input%maxlayers 
       write (stderr,'("**ERROR** ",a)') 'Please define a level ID for ALL layers!'
       error stop
     end if
@@ -438,9 +457,6 @@ contains  !> MODULE PROCEDURES START HERE
     end do
 
   end subroutine read_lwoniom_layerlvl
-
-
-
 
 #endif
 !========================================================================================!
@@ -566,6 +582,89 @@ contains  !> MODULE PROCEDURES START HERE
       close (ich)
     end if
   end subroutine read_bo
+
+!========================================================================================!
+
+
+  subroutine lwoniom_get_atlist(nat,atlist,line,at)
+!******************************************************
+!* Analyze a string containing atom specifications.
+!* "atlist" is a array of booleans for each atom,
+!* which is set to .true. should the atom be contained
+!* in atlist.
+!******************************************************
+    implicit none
+    integer,intent(in) :: nat
+    logical,intent(out),allocatable :: atlist(:)
+    character(len=*),intent(in) :: line
+    integer,intent(in),optional :: at(nat)
+    character(len=:),allocatable :: substr(:)
+    integer :: i,j,k,l,io,ns,ll,i1,i2,io1,io2,i3,i4
+    character(len=:),allocatable :: atmp,btmp
+
+    allocate (atlist(nat),source=.false.)
+!>-- count stuff
+    ll = len_trim(line)
+    ns = 1
+    do i = 1,ll
+      if (line(i:i) .eq. ',') ns = ns+1
+    end do
+    allocate (substr(ns),source=repeat(' ',ll))
+!>-- cut stuff
+    if (ns > 1) then
+      j = 1
+      k = 1
+      do i = 1,ll
+        if (k == ns) then
+          substr(k) = lowercase(adjustl(line(j:)))
+          exit
+        end if
+        if (line(i:i) .eq. ',') then
+          substr(k) = lowercase(adjustl(line(j:i-1)))
+          k = k+1
+          j = i+1
+        end if
+      end do
+    else
+      substr(1) = trim(line)
+    end if
+!>--- analyze stuff
+    do i = 1,ns
+      atmp = trim(substr(i))
+      if(atmp.eq.'all')then
+         atlist(:) = .true.
+         exit
+      endif
+      if(index(atmp,'.').ne.0) cycle !> exclude floats
+      l = index(atmp,'-')
+      if (l .eq. 0) then
+      !> single atom
+        read (atmp,*,iostat=io) i1
+        if (io /= 0) then
+          i2 = zsym_to_at(atmp)
+          if(i2 /= 0 .and. present(at)) then
+
+          endif
+        else
+          atlist(i1) = .true.
+        end if
+      else
+      !> range of atoms 
+        btmp = atmp(:l-1)
+        read (btmp,*,iostat=io1) i1
+        btmp = atmp(l+1:)
+        read (btmp,*,iostat=io2) i2
+        if (io1 .eq. 0.and.io2 .eq. 0) then
+          i4 = max(i1,i2)
+          i3 = min(i1,i2)
+          do j = 1,nat
+            if (i3 <= j.and.j <= i4) atlist(j) = .true.
+          end do
+        end if
+      end if
+    end do
+    deallocate(substr)
+  end subroutine lwoniom_get_atlist
 
 !========================================================================================!
 !========================================================================================!
