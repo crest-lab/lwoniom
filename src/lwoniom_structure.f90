@@ -55,8 +55,8 @@ module lwoniom_structures
     integer  :: nat = 0
     integer,allocatable  :: opos(:)   !> mapping of each atom in the original (topmost) layer
     integer,allocatable  :: at(:)     !> atomic number
-    logical :: replace_at = .false. 
-    integer,allocatable  :: at_high(:) 
+    logical :: replace_at = .false.
+    integer,allocatable  :: at_high(:)
     integer,allocatable  :: at_low(:)
     real(wp),allocatable :: xyz(:,:)  !> Cartesian coordinates, also atomic units -> Bohr
     real(wp),allocatable :: grd_high(:,:)
@@ -66,14 +66,14 @@ module lwoniom_structures
     integer :: nlink = 0
     integer,allocatable :: linkopos(:)    !> corresponds to which atom in original structure?
     integer,allocatable :: linksto(:)     !> links to which atom in this fragment?
-    real(wp),allocatable :: link_k(:)     !> link model scaling parameter g
+    real(wp),allocatable :: link_k(:)     !> link model scaling parameter k
     integer,allocatable :: linkat(:)      !> atom type (will be mostly H)
     real(wp),allocatable :: linkxyz(:,:)  !> Cartesian coordinates, in Bohr
     real(wp),allocatable :: linkgrd_high(:,:)  !> similar to grd, but for link atoms
     real(wp),allocatable :: linkgrd_low(:,:)  !> similar to grd, but for link atoms
 
     !> embedding information (TODO, for the future)
-    integer :: npoint
+    integer :: npoint = 0
     real(wp),allocatable :: pointc(:)
     real(wp),allocatable :: pointxyz(:,:)
 
@@ -82,11 +82,14 @@ module lwoniom_structures
     procedure :: add_child => structure_add_child
     procedure :: extract => extract_atoms_and_links
     procedure :: gradient_distribution
+    procedure :: project_gradient_init
     procedure :: allocate_link => allocating_linking_atoms
     procedure :: set_link => set_linking_atoms
     procedure :: dump_fragment !> for testing
     procedure :: jacobian => project_gradient_highlow
     procedure :: update => update_fragment
+    procedure :: dump_bin => lwoniom_structure_dump_bin
+    procedure :: read_bin => lwoniom_structure_read_bin
   end type structure_data
 !**************************************************************************!
 
@@ -110,7 +113,7 @@ module lwoniom_structures
   real(wp),parameter :: autoaa = bohr
   real(wp),parameter :: aatoau = angstrom
 !&>
-  public :: zsym_to_at,lowercase
+  public :: zsym_to_at,lowercase,PSE
 
 !========================================================================================!
 !========================================================================================!
@@ -319,6 +322,56 @@ contains  !> MODULE PROCEDURES START HERE
 
 !========================================================================================!
 
+  subroutine project_gradient_init(self,truenat)
+!****************************************************************
+!* Do a dry run of projecting both the high and low level
+!* gradients of the fragment into dimensions of the "true" system
+!*****************************************************************
+    implicit none
+    class(structure_data) :: self
+    integer,intent(in) :: truenat
+    integer :: m,n,i,j,l,k,i2,i3
+    integer :: fragnat
+    real(wp),allocatable :: g_high(:,:),g_low(:,:)
+
+    !> determine the total number of atoms in fragment
+    fragnat = self%nat+self%nlink
+
+    if (fragnat <= truenat) then
+      if (.not.allocated(self%grd_high)) then
+        allocate (self%grd_high(3,self%nat),source=0.0_wp)
+      end if
+      if (.not.allocated(self%linkgrd_high).and.self%nlink > 0) then
+        allocate (self%linkgrd_high(3,self%nlink),source=0.0_wp)
+      end if
+      !> allocate and call project_gradient for high level
+      if (.not.allocated(self%gradient_high)) allocate (self%gradient_high(3,truenat))
+      call project_gradient(self,fragnat, &
+      &  reshape([self%grd_high,self%linkgrd_high], [3,fragnat]), &
+      &  truenat,self%gradient_high)
+
+      if (.not.allocated(self%grd_low)) then
+        allocate (self%grd_low(3,self%nat),source=0.0_wp)
+      end if
+      if (.not.allocated(self%linkgrd_low).and.self%nlink > 0) then
+        allocate (self%linkgrd_low(3,self%nlink),source=0.0_wp)
+      end if
+
+      !> allocate and call project_gradient for low level
+      if (.not.allocated(self%gradient_low)) allocate (self%gradient_low(3,truenat))
+      call project_gradient(self,fragnat, &
+      &  reshape([self%grd_low,self%linkgrd_low], [3,fragnat]), &
+      &  truenat,self%gradient_low)
+
+      if (.not.allocated(self%gradient_qq)) then
+        allocate (self%gradient_qq(3,truenat),source=0.0_wp)
+      end if
+
+    end if
+  end subroutine project_gradient_init
+
+!========================================================================================!
+
   subroutine update_fragment(self,truenat,xyz,pc)
 !**************************************************
 !* Updates the fragment geometry (and point charges)
@@ -369,8 +422,14 @@ contains  !> MODULE PROCEDURES START HERE
     self%layer = 0
     self%parent = 0
     if (allocated(self%child)) deallocate (self%child)
+    if (allocated(self%gradient_high)) deallocate (self%gradient_high)
+    if (allocated(self%gradient_low)) deallocate (self%gradient_low)
+    if (allocated(self%gradient_qq)) deallocate (self%gradient_qq)
     self%nat = 0
     if (allocated(self%at)) deallocate (self%at)
+    self%replace_at = .false.
+    if (allocated(self%at_low)) deallocate (self%at_low)
+    if (allocated(self%at_high)) deallocate (self%at_high)
     if (allocated(self%xyz)) deallocate (self%xyz)
     if (allocated(self%grd_high)) deallocate (self%grd_high)
     if (allocated(self%grd_low)) deallocate (self%grd_low)
@@ -449,8 +508,8 @@ contains  !> MODULE PROCEDURES START HERE
     integer :: i,k,j,jj
 
     !> link atom coordinates
-    if(debug) write(*,*) 'atomtypes and link factors'
-    self%nlink=m
+    if (debug) write (*,*) 'atomtypes and link factors'
+    self%nlink = m
     do i = 1,m
       k = linking_atoms(1,i)
       self%linkopos(i) = k
@@ -458,7 +517,7 @@ contains  !> MODULE PROCEDURES START HERE
       jj = self%opos(j)
       self%linksto(i) = j
       self%linkat(i) = 1 !> Hydrogen for cuts through single bonds
-      if(debug) self%linkat(i) = 2
+      if (debug) self%linkat(i) = 2
       if (linking_atoms(3,i) > 1) then
         !> the linking atom is bound to multiple atoms in the fragment
         !> which means this is a bad setup. We set g to one
@@ -466,9 +525,9 @@ contains  !> MODULE PROCEDURES START HERE
       else
         !> the regular case, cuts through single bonds
         self%link_k(i) = link_ratio_k(at(k),at(jj),self%linkat(i))
-        if(debug)then
-           write(*,*) at(k),at(jj),self%linkat(i),self%link_k(i)
-        endif
+        if (debug) then
+          write (*,*) at(k),at(jj),self%linkat(i),self%link_k(i)
+        end if
       end if
 
       self%linkxyz(:,i) = link_position(xyz(:,k),xyz(:,jj),self%link_k(i))
@@ -562,6 +621,619 @@ contains  !> MODULE PROCEDURES START HERE
     end do
     call move_alloc(sout,lowerCase)
   end function lowerCase
+
+!========================================================================================!
+
+  subroutine lwoniom_structure_dump_bin(self,bin)
+!***********************************************************************
+!* handling of unformatted write for an entire lwoniom_structure object
+!* Enables easy acces I/O to the model setup
+!***********************************************************************
+    implicit none
+    class(structure_data) :: self
+    integer,intent(in) :: bin  !> output channel of the binary file
+    logical :: bdum
+    integer :: idum,i,j,k,l,m,n
+    integer :: d1,d2,d3
+
+    !> an identifier (position in the oniom list)
+    write (bin) self%id
+
+    !> layer tracker, one level of theory per layer
+    write (bin) self%layer
+    write (bin) self%parent
+
+    bdum = allocated(self%child)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%child,1)
+      write (bin) d1
+      do i = 1,d1
+        write (bin) self%child(i)
+      end do
+    end if
+    !> energies for level of theory at current layer (high) and parent layer (low)
+    write (bin) self%energy_high  !> high = QM
+    write (bin) self%energy_low   !> low  = MM/CC
+    write (bin) self%energy_qq
+    write (bin) self%truenat
+
+    !> high level gradient
+    bdum = allocated(self%gradient_high)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%gradient_high,1)
+      d2 = size(self%gradient_high,2)
+      write (bin) d1
+      write (bin) d2
+      do i = 1,d1
+        do j = 1,d2
+          write (bin) self%gradient_high(i,j)
+        end do
+      end do
+    end if
+    !> low level gradient
+    bdum = allocated(self%gradient_low)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%gradient_low,1)
+      d2 = size(self%gradient_low,2)
+      write (bin) d1
+      write (bin) d2
+      do i = 1,d1
+        do j = 1,d2
+          write (bin) self%gradient_low(i,j)
+        end do
+      end do
+    end if
+    !> reconstruction gradient
+    bdum = allocated(self%gradient_qq)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%gradient_qq,1)
+      d2 = size(self%gradient_qq,2)
+      write (bin) d1
+      write (bin) d2
+      do i = 1,d1
+        do j = 1,d2
+          write (bin) self%gradient_qq(i,j)
+        end do
+      end do
+    end if
+
+    !> projected via Jacobian
+    bdum = allocated(self%Jaco)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%Jaco,1)
+      d2 = size(self%Jaco,2)
+      write (bin) d1
+      write (bin) d2
+      do i = 1,d1
+        do j = 1,d2
+          write (bin) self%Jaco(i,j)
+        end do
+      end do
+    end if
+
+    !> system coordinates
+    write (bin) self%nat
+
+    !integer,allocatable  :: opos(:)   !> mapping of each atom in the original (topmost) layer
+    bdum = allocated(self%opos)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%opos,1)
+      write (bin) d1
+      do i = 1,d1
+        write (bin) self%opos(i)
+      end do
+    end if
+
+    !integer,allocatable  :: at(:)     !> atomic number
+    bdum = allocated(self%at)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%at,1)
+      write (bin) d1
+      do i = 1,d1
+        write (bin) self%at(i)
+      end do
+    end if
+
+    !logical :: replace_at = .false.
+    write (bin) self%replace_at
+
+    !integer,allocatable  :: at_high(:)
+    bdum = allocated(self%at_high)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%at_high,1)
+      write (bin) d1
+      do i = 1,d1
+        write (bin) self%at_high(i)
+      end do
+    end if
+
+    !integer,allocatable  :: at_low(:)
+    bdum = allocated(self%at_low)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%at_low,1)
+      write (bin) d1
+      do i = 1,d1
+        write (bin) self%at_low(i)
+      end do
+    end if
+
+    !real(wp),allocatable :: xyz(:,:)  !> Cartesian coordinates, also atomic units -> Bohr
+    bdum = allocated(self%xyz)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%xyz,1)
+      d2 = size(self%xyz,2)
+      write (bin) d1
+      write (bin) d2
+      do i = 1,d1
+        do j = 1,d2
+          write (bin) self%xyz(i,j)
+        end do
+      end do
+    end if
+
+    !real(wp),allocatable :: grd_high(:,:)
+    bdum = allocated(self%grd_high)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%grd_high,1)
+      d2 = size(self%grd_high,2)
+      write (bin) d1
+      write (bin) d2
+      do i = 1,d1
+        do j = 1,d2
+          write (bin) self%grd_high(i,j)
+        end do
+      end do
+    end if
+
+    !real(wp),allocatable :: grd_low(:,:)
+    bdum = allocated(self%grd_low)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%grd_low,1)
+      d2 = size(self%grd_low,2)
+      write (bin) d1
+      write (bin) d2
+      do i = 1,d1
+        do j = 1,d2
+          write (bin) self%grd_low(i,j)
+        end do
+      end do
+    end if
+
+    !> link atom coordinates
+    !integer :: nlink
+    write (bin) self%nlink
+
+    !integer,allocatable :: linkopos(:)    !> corresponds to which atom in original structure?
+    bdum = allocated(self%linkopos)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%linkopos,1)
+      write (bin) d1
+      do i = 1,d1
+        write (bin) self%linkopos(i)
+      end do
+    end if
+
+    !integer,allocatable :: linksto(:)     !> links to which atom in this fragment?
+    bdum = allocated(self%linksto)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%linksto,1)
+      write (bin) d1
+      do i = 1,d1
+        write (bin) self%linksto(i)
+      end do
+    end if
+
+    !real(wp),allocatable :: link_k(:)     !> link model scaling parameter k
+    bdum = allocated(self%link_k)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%link_k,1)
+      write (bin) d1
+      do i = 1,d1
+        write (bin) self%link_k(i)
+      end do
+    end if
+
+    !integer,allocatable :: linkat(:)      !> atom type (will be mostly H)
+    bdum = allocated(self%linkat)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%linkat,1)
+      write (bin) d1
+      do i = 1,d1
+        write (bin) self%linkat(i)
+      end do
+    end if
+
+    !real(wp),allocatable :: linkxyz(:,:)  !> Cartesian coordinates, in Bohr
+    bdum = allocated(self%linkxyz)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%linkxyz,1)
+      d2 = size(self%linkxyz,2)
+      write (bin) d1
+      write (bin) d2
+      do i = 1,d1
+        do j = 1,d2
+          write (bin) self%linkxyz(i,j)
+        end do
+      end do
+    end if
+
+    !real(wp),allocatable :: linkgrd_high(:,:)  !> similar to grd, but for link atoms
+    bdum = allocated(self%linkgrd_high)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%linkgrd_high,1)
+      d2 = size(self%linkgrd_high,2)
+      write (bin) d1
+      write (bin) d2
+      do i = 1,d1
+        do j = 1,d2
+          write (bin) self%linkgrd_high(i,j)
+        end do
+      end do
+    end if
+
+    !real(wp),allocatable :: linkgrd_low(:,:)  !> similar to grd, but for link atoms
+    bdum = allocated(self%linkgrd_low)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%linkgrd_low,1)
+      d2 = size(self%linkgrd_low,2)
+      write (bin) d1
+      write (bin) d2
+      do i = 1,d1
+        do j = 1,d2
+          write (bin) self%linkgrd_low(i,j)
+        end do
+      end do
+    end if
+
+    !> embedding information (TODO, for the future)
+    !integer :: npoint = 0
+    write (bin) self%npoint
+
+    !real(wp),allocatable :: pointc(:)
+    bdum = allocated(self%pointc)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%pointc,1)
+      write (bin) d1
+      do i = 1,d1
+        write (bin) self%pointc(i)
+      end do
+    end if
+
+    !real(wp),allocatable :: pointxyz(:,:)
+    bdum = allocated(self%pointxyz)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%pointxyz,1)
+      d2 = size(self%pointxyz,2)
+      write (bin) d1
+      write (bin) d2
+      do i = 1,d1
+        do j = 1,d2
+          write (bin) self%pointxyz(i,j)
+        end do
+      end do
+    end if
+
+  end subroutine lwoniom_structure_dump_bin
+
+  subroutine lwoniom_structure_read_bin(self,bin)
+!***********************************************************************
+!* handling of unformatted read for an entire lwoniom_structure object
+!* Enables easy acces I/O to the model setup
+!***********************************************************************
+    implicit none
+    class(structure_data) :: self
+    integer,intent(in) :: bin  !> output channel of the binary file
+    logical :: bdum
+    integer :: idum,i,j,k,l,m,n
+    integer :: d1,d2,d3
+    logical,parameter :: debug = .false.
+
+    call self%deallocate()
+
+    !> an identifier (position in the oniom list)
+    read (bin) self%id
+    if(debug) write(*,*) self%id
+
+
+    !> layer tracker, one level of theory per layer
+    read (bin) self%layer
+    read (bin) self%parent
+
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*)  'reading self%child'
+      read (bin) d1
+      allocate (self%child(d1))
+      do i = 1,d1
+        read (bin) self%child(i)
+      end do
+    end if
+    !> energies for level of theory at current layer (high) and parent layer (low)
+    read (bin) self%energy_high  !> high = QM
+    read (bin) self%energy_low   !> low  = MM/CC
+    read (bin) self%energy_qq
+    read (bin) self%truenat
+
+    !> high level gradient
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*) 'reading self%gradient_high'
+      read (bin) d1
+      read (bin) d2
+      allocate (self%gradient_high(d1,d2))
+      do i = 1,d1
+        do j = 1,d2
+          read (bin) self%gradient_high(i,j)
+        end do
+      end do
+    end if
+    !> low level gradient
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*) 'reading self%gradient_low'
+      read (bin) d1
+      read (bin) d2
+      allocate (self%gradient_low(d1,d2))
+      do i = 1,d1
+        do j = 1,d2
+          read (bin) self%gradient_low(i,j)
+        end do
+      end do
+    end if
+    !> reconstruction gradient
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*) 'reading self%gradient_qq'
+      read (bin) d1
+      read (bin) d2
+      allocate (self%gradient_qq(d1,d2))
+      do i = 1,d1
+        do j = 1,d2
+          read (bin) self%gradient_qq(i,j)
+        end do
+      end do
+    end if
+
+    !> projected via Jacobian
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*) 'reading self%Jaco'
+      read (bin) d1
+      read (bin) d2
+      allocate (self%Jaco(d1,d2))
+      do i = 1,d1
+        do j = 1,d2
+          read (bin) self%Jaco(i,j)
+        end do
+      end do
+    end if
+
+    !> system coordinates
+    read (bin) self%nat
+
+    !integer,allocatable  :: opos(:)   !> mapping of each atom in the original (topmost) layer
+    read (bin) bdum
+    if (bdum) then
+      read (bin) d1
+      allocate (self%opos(d1))
+      do i = 1,d1
+        read (bin) self%opos(i)
+      end do
+    end if
+
+    !integer,allocatable  :: at(:)     !> atomic number
+    read (bin) bdum
+    if (bdum) then
+      read (bin) d1
+      allocate (self%at(d1))
+      do i = 1,d1
+        read (bin) self%at(i)
+      end do
+    end if
+
+    !logical :: replace_at = .false.
+    read (bin) self%replace_at
+
+    !integer,allocatable  :: at_high(:)
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*) 'reading self%at_high'
+      read (bin) d1
+      allocate (self%at_high(d1))
+      do i = 1,d1
+        read (bin) self%at_high(i)
+      end do
+    end if
+
+    !integer,allocatable  :: at_low(:)
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*) 'reading self%at_low'
+      read (bin) d1
+      allocate (self%at_low(d1))
+      do i = 1,d1
+        read (bin) self%at_low(i)
+      end do
+    end if
+
+    !real(wp),allocatable :: xyz(:,:)  !> Cartesian coordinates, also atomic units -> Bohr
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*) 'reading self%xyz'
+      read (bin) d1
+      read (bin) d2
+      allocate (self%xyz(d1,d2))
+      do i = 1,d1
+        do j = 1,d2
+          read (bin) self%xyz(i,j)
+        end do
+      end do
+    end if
+
+    !real(wp),allocatable :: grd_high(:,:)
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*) 'reading self%grd_high'
+      read (bin) d1
+      read (bin) d2
+      allocate (self%grd_high(d1,d2))
+      do i = 1,d1
+        do j = 1,d2
+          read (bin) self%grd_high(i,j)
+        end do
+      end do
+    end if
+
+    !real(wp),allocatable :: grd_low(:,:)
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*) 'reading self%grd_low'
+      read (bin) d1
+      read (bin) d2
+      allocate (self%grd_low(d1,d2))
+      do i = 1,d1
+        do j = 1,d2
+          read (bin) self%grd_low(i,j)
+        end do
+      end do
+    end if
+
+    !> link atom coordinates
+    !integer :: nlink
+    read (bin) self%nlink
+
+    !integer,allocatable :: linkopos(:)    !> corresponds to which atom in original structure?
+    read (bin) bdum
+    if (bdum) then
+      read (bin) d1
+      allocate (self%linkopos(d1))
+      do i = 1,d1
+        read (bin) self%linkopos(i)
+      end do
+    end if
+
+    !integer,allocatable :: linksto(:)     !> links to which atom in this fragment?
+    read (bin) bdum
+    if (bdum) then
+      read (bin) d1
+      allocate (self%linksto(d1))
+      do i = 1,d1
+        read (bin) self%linksto(i)
+      end do
+    end if
+
+    !real(wp),allocatable :: link_k(:)     !> link model scaling parameter k
+    read (bin) bdum
+    if (bdum) then
+      read (bin) d1
+      allocate (self%link_k(d1))
+      do i = 1,d1
+        read (bin) self%link_k(i)
+      end do
+    end if
+
+    !integer,allocatable :: linkat(:)      !> atom type (will be mostly H)
+    read (bin) bdum
+    if (bdum) then
+      read (bin) d1
+      allocate (self%linkat(d1))
+      do i = 1,d1
+        read (bin) self%linkat(i)
+      end do
+    end if
+
+    !real(wp),allocatable :: linkxyz(:,:)  !> Cartesian coordinates, in Bohr
+    read (bin) bdum
+    if (bdum) then
+      read (bin) d1
+      read (bin) d2
+      allocate (self%linkxyz(d1,d2))
+      do i = 1,d1
+        do j = 1,d2
+          read (bin) self%linkxyz(i,j)
+        end do
+      end do
+    end if
+
+    !real(wp),allocatable :: linkgrd_high(:,:)  !> similar to grd, but for link atoms
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*) 'reading self%linkgrd_high'
+      read (bin) d1
+      read (bin) d2
+      allocate (self%linkgrd_high(d1,d2))
+      do i = 1,d1
+        do j = 1,d2
+          read (bin) self%linkgrd_high(i,j)
+        end do
+      end do
+    end if
+
+    !real(wp),allocatable :: linkgrd_low(:,:)  !> similar to grd, but for link atoms
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*) 'reading self%linkgrd_low'
+      read (bin) d1
+      read (bin) d2
+      allocate (self%linkgrd_low(d1,d2))
+      do i = 1,d1
+        do j = 1,d2
+          read (bin) self%linkgrd_low(i,j)
+        end do
+      end do
+    end if
+
+    !> embedding information (TODO, for the future)
+    !integer :: npoint = 0
+    read (bin) self%npoint
+
+    !real(wp),allocatable :: pointc(:)
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*) 'reading self%pointc'
+      read (bin) d1
+      allocate (self%pointc(d1))
+      do i = 1,d1
+        read (bin) self%pointc(i)
+      end do
+    end if
+
+    !real(wp),allocatable :: pointxyz(:,:)
+    read (bin) bdum
+    if (bdum) then
+      if(debug) write(*,*) 'reading self%pointxyz'
+      read (bin) d1
+      read (bin) d2
+      allocate (self%pointxyz(d1,d2))
+      do i = 1,d1
+        do j = 1,d2
+          read (bin) self%pointxyz(i,j)
+        end do
+      end do
+    end if
+
+  end subroutine lwoniom_structure_read_bin
 
 !========================================================================================!
 !========================================================================================!

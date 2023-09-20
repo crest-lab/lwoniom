@@ -49,7 +49,7 @@ module lwoniom_setup
     !> root fragment id (the original system)
     integer :: root_id = 0
     !> replace atom-types in any of the layers?
-    logical :: replace_at = .false. 
+    logical :: replace_at = .false.
 
     !> further system information
     integer,allocatable :: bond(:,:)
@@ -65,6 +65,8 @@ module lwoniom_setup
     procedure :: add_fragment => lwoniom_add_fragment
     procedure :: dump_fragments => lwoniom_dump_fragments
     procedure :: update => lwoniom_update_fragments
+    procedure :: dump_bin => lwoniom_dump_bin
+    procedure :: read_bin => lwoniom_read_bin
   end type lwoniom_data
 !************************************************************!
 
@@ -191,22 +193,22 @@ contains  !> MODULE PROCEDURES START HERE
     end if
     layer_tmp(:) = layer(:)
     allocate (indexf(nat))
-    if(debug)then
-      write(*,*) present(fragment)
-      do i=1,nat
-        write(*,*) fragment_tmp(i),layer_tmp(i) 
-      enddo
-    endif
+    if (debug) then
+      write (*,*) present(fragment)
+      do i = 1,nat
+        write (*,*) fragment_tmp(i),layer_tmp(i)
+      end do
+    end if
 
     !> determine maxf and indexf, i.e. the number of "nodes"
     !> and the mapping which atom belongs to which node
     call count_fragments(nat,layer_tmp,fragment_tmp,maxf,indexf)
     dat%nlayer = maxval(layer_tmp,1)
-    if(debug)then
-      write(*,*) 'maxf',maxf
-      write(*,*) 'nlayer',dat%nlayer
-      write(*,*) 'indexf',indexf
-    endif
+    if (debug) then
+      write (*,*) 'maxf',maxf
+      write (*,*) 'nlayer',dat%nlayer
+      write (*,*) 'indexf',indexf
+    end if
 
     !> For the next steps we need some kind of connectivity information
     !> either provided by the user or determined from covalent radii
@@ -227,7 +229,7 @@ contains  !> MODULE PROCEDURES START HERE
       call construct_tree_ONIOM_classic(maxf,parent)
 
     else if (allocated(bond_tmp)) then
-      if(debug) write(*,*) 'creating MC-ONIOMn tree ...'
+      if (debug) write (*,*) 'creating MC-ONIOMn tree ...'
       call construct_tree_ONIOM_multicenter(nat,layer_tmp,indexf,bond_tmp,maxf,parent)
 
     else
@@ -266,6 +268,13 @@ contains  !> MODULE PROCEDURES START HERE
 ! Determine the linking atoms between layers
     call determine_linking_atoms(dat,at,xyz,bond_tmp)
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Finally, create storage for true gradients and Jacobians
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    do i = 1,dat%nfrag
+      call dat%fragment(i)%project_gradient_init(nat)
+    end do
+
     if ((io /= 0).and.pr) then
       write (myunit,'("Could not create lwONIOM object ",a)') source
     end if
@@ -301,13 +310,12 @@ contains  !> MODULE PROCEDURES START HERE
       !> loop over all atoms in the fragments i
       !> number of atoms in fragment i inherited from the original structure
       nat_fragment = self%fragment(i)%nat
-      if(debug)then 
-         write(*,*) 'fragment',i,'atoms'
-         do j=1,nat_fragment
-           write(*,*) j,'-->',self%fragment(i)%opos(j)
-         enddo
-      endif
-
+      if (debug) then
+        write (*,*) 'fragment',i,'atoms'
+        do j = 1,nat_fragment
+          write (*,*) j,'-->',self%fragment(i)%opos(j)
+        end do
+      end if
 
       !> m will count the total number of link atoms in fragment i
       m = 0
@@ -326,7 +334,7 @@ contains  !> MODULE PROCEDURES START HERE
             !> ... check if k is any of the atoms in fragment i
             !> if k is NOT a member of the fragment, it must be a new link atom
             if (.not.any(self%fragment(i)%opos(:) .eq. k)) then
-              if(debug) write(*,'(1x,a,i0,a,i0)')'link bond   ',l,' - ',k
+              if (debug) write (*,'(1x,a,i0,a,i0)') 'link bond   ',l,' - ',k
 
               !> The only exception is when k is already a link atom for another atom
               if (any(linking_atoms(1,:) .eq. k)) then
@@ -351,11 +359,11 @@ contains  !> MODULE PROCEDURES START HERE
           end if
         end do
       end do
-      if(debug)then
-        do j=1,m
-          write(*,*) linking_atoms(:,j) 
-        enddo
-      endif
+      if (debug) then
+        do j = 1,m
+          write (*,*) linking_atoms(:,j)
+        end do
+      end if
       !>allocating m linking atoms for fragment i
       call self%fragment(i)%allocate_link(m)
       call self%fragment(i)%set_link(m,nat,at,xyz,linking_atoms)
@@ -435,10 +443,10 @@ contains  !> MODULE PROCEDURES START HERE
     maxf = 0
     indexf(:) = 0
     allocate (tmp(nat))
-    
+
     !> iterate through the layers and repair indices
     minl = minval(layer,1)
-    layer(:) = layer(:) - minl + 1 !> set lowest layer index to 1
+    layer(:) = layer(:)-minl+1 !> set lowest layer index to 1
     maxl = maxval(layer,1)
     do i = 1,maxval(layer,1)
       if (i > maxl) cycle !> safety, since maxl could decrease
@@ -454,24 +462,24 @@ contains  !> MODULE PROCEDURES START HERE
           cycle
         end if
       end do
-    enddo
+    end do
     maxl = maxval(layer,1)
 
     !> classical ONIOM case, one subsystem per layer
-    if(all(fragment(:).eq.0))then
+    if (all(fragment(:) .eq. 0)) then
       indexf(:) = layer(:)
       maxf = maxl
     else
       indexf(:) = fragment(:)
       minf = minval(fragment,1)
-      indexf(:) = indexf(:) - minf + 1
+      indexf(:) = indexf(:)-minf+1
       maxf = maxval(indexf,1)
-      if(maxl > maxf)then
-        write(stderr,'(a)') "**ERROR** Can't have more layers than subsystems!"
-        write(stderr,'(10x,a)') 'This can occur if there is exact overlap between two layers.'
+      if (maxl > maxf) then
+        write (stderr,'(a)') "**ERROR** Can't have more layers than subsystems!"
+        write (stderr,'(10x,a)') 'This can occur if there is exact overlap between two layers.'
         error stop
-      endif
-    endif
+      end if
+    end if
 
     deallocate (tmp)
   end subroutine count_fragments
@@ -517,13 +525,13 @@ contains  !> MODULE PROCEDURES START HERE
       !> go through substructures
       do j = 1,maxf
         do k = 1,nat
-          if (indexf(k) == j .and. layer(k) == i) then
+          if (indexf(k) == j.and.layer(k) == i) then
             !> found an atom belonging to fragment j and layer i, now check to what
             !> upper layer/fragment it is connected.
             !> It should be connected to at least one atom in the next higher layer
             !> because otherwise there is perfect overlap between fragments
             do l = 1,nat
-              if (abs(bond(l,k)) > 0 .and. layer(l) == i-1) then
+              if (abs(bond(l,k)) > 0.and.layer(l) == i-1) then
                 parent(j) = indexf(l)
               end if
             end do
@@ -702,6 +710,7 @@ contains  !> MODULE PROCEDURES START HERE
   end subroutine lwoniom_dump_fragments
 
 !========================================================================================!
+
   subroutine lwoniom_update_fragments(self,xyz,pc)
 !*********************************
 !* The geometry on all fragments.
@@ -718,6 +727,214 @@ contains  !> MODULE PROCEDURES START HERE
     end do
   end subroutine lwoniom_update_fragments
 
+!========================================================================================!
+
+  subroutine lwoniom_dump_bin(self)
+!***********************************************************
+!* Write routine for an lwoniom_data object to binary file
+!* Makes easier I/O accesible
+!***********************************************************
+    implicit none
+    class(lwoniom_data) :: self
+    integer :: bin
+    integer :: d1,d2,i,j
+    logical :: bdum
+
+    open (newunit=bin,file='lwoniom.data',status='replace',access='stream')!form='binary')
+
+    !> number of layers
+    !integer :: nlayer = 0
+    write (bin) self%nlayer
+
+    !integer,allocatable :: layer(:)
+    bdum = allocated(self%layer)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%layer,1)
+      write (bin) d1
+      do i = 1,d1
+        write (bin) self%layer(i)
+      end do
+    end if
+
+    !> number of fragments
+    !integer :: nfrag = 0
+    write (bin) self%nfrag
+
+    !> list of fragments (subsystems)
+    !type(structure_data),allocatable :: fragment(:)
+    bdum = allocated(self%fragment)
+    write (bin) bdum
+    if (bdum) then
+      d1 = self%nfrag
+      write (bin) d1
+      !write(*,*) 'dump fragments', d1
+      do i = 1,d1
+        call self%fragment(i)%dump_bin(bin)
+      end do
+    end if
+
+    !> root fragment id (the original system)
+    !integer :: root_id = 0
+    write (bin) self%root_id
+
+    !> replace atom-types in any of the layers?
+    !logical :: replace_at = .false.
+    write (bin) self%replace_at
+
+    !> further system information
+    !integer,allocatable :: bond(:,:)
+    bdum = allocated(self%bond)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%bond,1)
+      d2 = size(self%bond,2)
+      write (bin) d1
+      write (bin) d2
+      do i = 1,d1
+        do j = 1,d2
+          write (bin) self%bond(i,j)
+        end do
+      end do
+    end if
+
+    !integer,allocatable :: indexf(:)
+    bdum = allocated(self%indexf)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%indexf,1)
+      write (bin) d1
+      do i = 1,d1
+        write (bin) self%indexf(i)
+      end do
+    end if
+
+    !> calculation mapping
+    !integer :: ncalcs !> total number of required calculations
+    write (bin) self%ncalcs
+
+    !integer,allocatable :: calcids(:,:)  !> high (1,:) and low (2,:) level IDs for each fragment
+    bdum = allocated(self%calcids)
+    write (bin) bdum
+    if (bdum) then
+      d1 = size(self%calcids,1)
+      d2 = size(self%calcids,2)
+      write (bin) d1
+      write (bin) d2
+      do i = 1,d1
+        do j = 1,d2
+          write (bin) self%calcids(i,j)
+        end do
+      end do
+    end if
+
+    close (bin)
+  end subroutine lwoniom_dump_bin
+
+  subroutine lwoniom_read_bin(self,success)
+!***********************************************************
+!* Read routine for an lwoniom_data object to binary file
+!* Makes easier I/O accesible
+!***********************************************************
+    implicit none
+    class(lwoniom_data) :: self
+    integer :: bin
+    integer :: d1,d2,i,j
+    logical :: bdum,ex
+    logical,intent(out) :: success
+
+    success = .false.
+    inquire (file='lwoniom.data',exist=ex)
+    if (.not.ex) return
+
+    open (newunit=bin,file='lwoniom.data',status='old',access='stream')!,form='binary')
+
+    !> number of layers
+    !integer :: nlayer = 0
+    read (bin) self%nlayer
+
+    !integer,allocatable :: layer(:)
+    read (bin) bdum
+    if (bdum) then
+      read (bin) d1
+      allocate (self%layer(d1))
+      do i = 1,d1
+        read (bin) self%layer(i)
+      end do
+    end if
+
+    !> number of fragments
+    !integer :: nfrag = 0
+    read (bin) self%nfrag
+
+    !> list of fragments (subsystems)
+    !type(structure_data),allocatable :: fragment(:)
+    read (bin) bdum
+    if (bdum) then
+      read (bin) d1
+      allocate (self%fragment(d1))
+      !write(*,*) 'read fragments',d1 
+      do i = 1,d1
+        call self%fragment(i)%read_bin(bin)
+        call self%fragment(i)%dump_fragment()
+      end do
+    end if
+
+    !> root fragment id (the original system)
+    !integer :: root_id = 0
+    read (bin) self%root_id
+
+    !> replace atom-types in any of the layers?
+    !logical :: replace_at = .false.
+    read (bin) self%replace_at
+
+    !> further system information
+    !integer,allocatable :: bond(:,:)
+    read (bin) bdum
+    if (bdum) then
+      read (bin) d1
+      read (bin) d2
+      allocate (self%bond(d1,d2))
+      do i = 1,d1
+        do j = 1,d2
+          read (bin) self%bond(i,j)
+        end do
+      end do
+    end if
+
+    !integer,allocatable :: indexf(:)
+    read (bin) bdum
+    if (bdum) then
+      read (bin) d1
+      allocate (self%indexf(d1))
+      do i = 1,d1
+        read (bin) self%indexf(i)
+      end do
+    end if
+
+    !> calculation mapping
+    !integer :: ncalcs !> total number of required calculations
+    read (bin) self%ncalcs
+
+    !integer,allocatable :: calcids(:,:)  !> high (1,:) and low (2,:) level IDs for each fragment
+    read (bin) bdum
+    if (bdum) then
+      read (bin) d1
+      read (bin) d2
+      allocate (self%calcids(d1,d2))
+      do i = 1,d1
+        do j = 1,d2
+          read (bin) self%calcids(i,j)
+        end do
+      end do
+    end if
+
+    close (bin)
+    success = .true.
+
+  end subroutine lwoniom_read_bin
+
+!========================================================================================!
 !========================================================================================!
 end module lwoniom_setup
 

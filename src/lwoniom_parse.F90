@@ -21,7 +21,7 @@ module lwoniom_parse
 #ifdef WITH_TOMLF
   use tomlf
 #endif
-  use lwoniom_structures, only:  zsym_to_at,lowercase
+  use lwoniom_structures, only:  zsym_to_at,lowercase,PSE
   implicit none
   private
 
@@ -45,6 +45,9 @@ module lwoniom_parse
     real(wp),allocatable :: xyz(:,:)
     character(len=:),allocatable :: cmd(:)
     integer,allocatable :: layerlvl(:)
+    integer,allocatable :: layerreplace(:,:)
+
+    logical :: try_bin = .false.
   contains
     procedure :: deallocate => deallocate_lwoniom_input
     procedure :: parse_xyz => parse_structure_xyz
@@ -151,6 +154,7 @@ contains  !> MODULE PROCEDURES START HERE
     type(toml_key),allocatable :: list(:)
     character(len=:),allocatable :: key
     character(len=:),allocatable :: val
+    logical :: ex
 
     !> first get total number of atoms and allocate
     call get_value(table,"natoms",input%nat,stat=io)
@@ -189,8 +193,22 @@ contains  !> MODULE PROCEDURES START HERE
           call read_bo(input%wbofile,input%nat,input%wbo)
         end if
 
+      case('restart')
+        call get_value(table,key,input%try_bin,stat=io)
+        if (io == toml_stat%success) then
+          if(input%try_bin ) write (stdout,'(a,a)') ns,'trying to restart from from lwoniom.data'
+        else
+          input%try_bin = .false.
+        end if
+ 
       end select
     end do
+
+    !> check if we are in restart mode and potentially can restart
+    if(input%try_bin)then
+      inquire(file='lwoniom.data',exist=ex)
+      if(ex) return !> we can leave the routine in this case. good luck.
+    endif
 
     !> atom-wise definitions of fragments first
     call get_value(table,'fragment',child,requested=.false.)
@@ -246,6 +264,15 @@ contains  !> MODULE PROCEDURES START HERE
       call read_lwoniom_layerlvl(error,input,child)
     end if
 
+    !> replace elements in some layers
+    call get_value(table,'replace',child,requested=.false.)
+    if (associated(child)) then
+      if (input%maxlayers < 1) then
+        write (stderr,'("**ERROR** ",a)') 'Layer replacements must not be defined without defining layers first'
+        stop
+      end if
+      call read_lwoniom_layerreplace(error,input,child)
+    end if
 
   end subroutine read_lwoniom_block
 
@@ -457,6 +484,74 @@ contains  !> MODULE PROCEDURES START HERE
     end do
 
   end subroutine read_lwoniom_layerlvl
+
+
+  subroutine read_lwoniom_layerreplace(error,input,table)
+!*******************************************************
+!* Read elements to replace in a given layer
+!* Shall be used for each of the layers
+!* the toml syntax will look like this:
+!* replace.1.he = 'xe'   #to replace He with Xe
+!*******************************************************
+    !> Error handler
+    type(toml_error),allocatable :: error
+    !> Hamiltonian input to be read
+    type(lwoniom_input),intent(inout) :: input
+    !> Data structure
+    type(toml_table),intent(inout) :: table
+    type(toml_table),pointer :: child
+    type(toml_table) :: newtable
+    integer :: io,i,j,k,l,f,io2,io3,i1,i2
+    integer :: ikey,childikey
+    type(toml_key),allocatable :: list(:)
+    type(toml_key),allocatable :: childlist(:) 
+    type(toml_array),pointer    :: arr
+    character(len=:),allocatable :: key
+    character(len=:),allocatable :: val
+    integer,allocatable :: lay(:)
+    integer :: lvl
+
+    !> iterate over keys (which should be integer numbers)
+    call table%get_keys(list)
+    if(.not.allocated(input%layerreplace)) &
+    &  allocate(input%layerreplace(118,input%maxlayers ), source = 0 )
+    do ikey = 1,size(list)
+      key = list(ikey)%key
+      read (key,*,iostat=io) l !> the key must be a number referring to a layer
+      if (io == 0 .and. l <= input%maxlayers) then
+
+        call get_value(table,key,child,requested=.false.)
+        if (associated(child)) then  
+          call child%get_keys(childlist) !> the other keys are element symbols  
+          do childikey = 1,size(childlist)
+            key = childlist(childikey)%key 
+            call get_value(child,key,val,stat=io2)
+            if (io2 == 0) then
+              i1 = zsym_to_at(key)
+              i2 = zsym_to_at(val)  
+              input%layerreplace( i1 , l ) = i2
+            endif
+          enddo 
+        endif
+      end if
+    end do
+
+    k = 0
+    do l=1,input%maxlayers
+      do i=1,118
+         j = input%layerreplace( i , l )
+         if( j > 0)then
+           k = k +1
+           write(stdout,'(4a,i0,2a)') ns,'replacing "',trim(PSE(i)),'" atoms in layer ',l, &
+           & ' with "',trim(PSE(j))//'"'
+         endif  
+      enddo
+    enddo
+    if(k < 1) deallocate(input%layerreplace)
+
+  end subroutine read_lwoniom_layerreplace
+
+
 
 #endif
 !========================================================================================!

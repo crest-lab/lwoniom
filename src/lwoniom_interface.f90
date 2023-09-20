@@ -57,9 +57,16 @@ contains  !> MODULE PROCEDURES START HERE
     !> the calculator/data type to be created
     type(lwoniom_data),intent(out) :: dat
     !> LOCAL
-    integer :: i,j,k,l,p
+    integer :: i,j,k,l,p,ii,jj,kk,ll
     integer,allocatable :: at(:),bond(:,:)
-    logical :: ex
+    logical :: ex,success
+
+    if(inp%try_bin)then
+      call dat%read_bin(success)
+      write(stdout,'("lwONIOM> ",a,l4)') 'successfully read lwoniom.data?  ',success
+      if(success) return
+    endif
+
 
     if (allocated(inp%xyz).and. &
         allocated(inp%layer).and.allocated(inp%frag)) then
@@ -113,6 +120,38 @@ contains  !> MODULE PROCEDURES START HERE
            endif
          enddo
        endif
+
+       !> atom replacement in layers?
+       if(allocated(inp%layerreplace))then
+         dat%replace_at = .true.
+         do i=1,dat%nlayer
+           if(.not.any(inp%layerreplace(:,i) > 0)) cycle
+           do j=1,dat%nfrag
+              k = dat%fragment(j)%layer
+              if( i == k )then
+                do ii=1,size(inp%layerreplace,1)
+                  kk = inp%layerreplace(ii,i) 
+                  if( kk > 0)then
+                    !write(*,*) '#####',j,ii,'-->',kk 
+                    do jj=1,dat%fragment(j)%nat
+                      if(dat%fragment(j)%at(jj) == ii)then
+                        dat%fragment(j)%at(jj) = kk
+                      endif
+                    enddo
+                  endif
+                enddo
+                !write(*,*) dat%fragment(j)%at
+              endif
+           enddo
+         enddo 
+       endif
+
+
+       write(stdout,'("lwONIOM> ",a)') 'writing lwONIOM model to "lwoniom.data" binary file ... '
+       flush(stdout)  
+       call dat%dump_bin
+       write(stdout, '("lwONIOM> ",a)') 'done.'
+  
 
     else
       write (stderr,'("**ERROR** ",a)') "Required lwoniom_input setup info missing!"
