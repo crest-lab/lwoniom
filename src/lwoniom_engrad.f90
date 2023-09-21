@@ -72,8 +72,8 @@ contains  !> MODULE PROCEDURES START HERE
     call engrad_recursion(dat,root_id,nat)
 
     !> additive energy and gradient
-    energy = energy + dat%fragment(root_id)%energy_qq
-    gradient(:,:) = gradient + dat%fragment(root_id)%gradient_qq
+    energy = energy+dat%fragment(root_id)%energy_qq
+    gradient(:,:) = gradient+dat%fragment(root_id)%gradient_qq
 
     if (present(iostat)) then
       iostat = io

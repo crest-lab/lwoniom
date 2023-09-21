@@ -21,7 +21,7 @@ module lwoniom_parse
 #ifdef WITH_TOMLF
   use tomlf
 #endif
-  use lwoniom_structures, only:  zsym_to_at,lowercase,PSE
+  use lwoniom_structures,only:zsym_to_at,lowercase,PSE
   implicit none
   private
 
@@ -36,8 +36,8 @@ module lwoniom_parse
     integer :: nat = 0
     integer :: maxfragments = 0
     integer :: maxlayers = 0
-    integer,allocatable :: layer(:)
-    integer,allocatable :: frag(:)
+    logical,allocatable :: layer(:,:)
+    logical,allocatable :: frag(:,:)
     character(len=:),allocatable :: wbofile
     real(wp),allocatable :: wbo(:,:)
     character(len=2),allocatable :: zsym(:)
@@ -46,7 +46,8 @@ module lwoniom_parse
     character(len=:),allocatable :: cmd(:)
     integer,allocatable :: layerlvl(:)
     integer,allocatable :: layerreplace(:,:)
-
+    logical :: dump_frag = .false.
+    logical :: dump_layer = .false.
     logical :: try_bin = .false.
   contains
     procedure :: deallocate => deallocate_lwoniom_input
@@ -76,6 +77,9 @@ contains  !> MODULE PROCEDURES START HERE
     if (allocated(self%wbo)) deallocate (self%wbo)
     if (allocated(self%zsym)) deallocate (self%zsym)
     if (allocated(self%xyz)) deallocate (self%xyz)
+    if (allocated(self%cmd)) deallocate (self%cmd)
+    if (allocated(self%layerlvl)) deallocate (self%layerlvl)
+    if (allocated(self%layerreplace)) deallocate (self%layerreplace)
   end subroutine deallocate_lwoniom_input
 
 !=======================================================================================!
@@ -98,16 +102,16 @@ contains  !> MODULE PROCEDURES START HERE
     logical :: ex,req
 
     req = .true.
-    if(present(required))then
-       req = required
-    endif
+    if (present(required)) then
+      req = required
+    end if
 
     inquire (file=tomlfile,exist=ex)
     if (.not.ex) then
       write (stderr,'("**ERROR** ",a,a,a)') "input file ",trim(tomlfile)," not found!"
       return
     end if
-    if(req) write (stdout,'(a,a,a)') ns,"reading input file ",trim(tomlfile)
+    if (req) write (stdout,'(a,a,a)') ns,"reading input file ",trim(tomlfile)
 
     !> the actual "reading" part
     open (newunit=io,file=tomlfile)
@@ -120,7 +124,7 @@ contains  !> MODULE PROCEDURES START HERE
     !> look for [lwoniom] block
     call get_value(table,"lwoniom",child,requested=.false.)
     if (.not.associated(child)) then
-      if(req) write (stderr,'("**ERROR** ",a,a)') "No [lwoniom] section found in input file ",trim(tomlfile)
+      if (req) write (stderr,'("**ERROR** ",a,a)') "No [lwoniom] section found in input file ",trim(tomlfile)
       if (allocated(error)) deallocate (error)
       if (allocated(table)) deallocate (table)
       return
@@ -158,14 +162,12 @@ contains  !> MODULE PROCEDURES START HERE
 
     !> first get total number of atoms and allocate
     call get_value(table,"natoms",input%nat,stat=io)
-    if (io /= toml_stat%success .and. .not.present(natoms)) then
+    if (io /= toml_stat%success.and..not.present(natoms)) then
       write (stderr,'("**ERROR** ",a)') "Please provide the total number of atoms (natoms) in [lwoniom] block"
       return
-    else if( present(natoms))then
-       input%nat = natoms
+    else if (present(natoms)) then
+      input%nat = natoms
     end if
-    allocate (input%layer(input%nat),source=0)
-    allocate (input%frag(input%nat),source=0)
 
     !> iterate over keys (to check for input xyz, and other info)
     call table%get_keys(list)
@@ -193,22 +195,22 @@ contains  !> MODULE PROCEDURES START HERE
           call read_bo(input%wbofile,input%nat,input%wbo)
         end if
 
-      case('restart')
+      case ('restart')
         call get_value(table,key,input%try_bin,stat=io)
         if (io == toml_stat%success) then
-          if(input%try_bin ) write (stdout,'(a,a)') ns,'trying to restart from from lwoniom.data'
+          if (input%try_bin) write (stdout,'(a,a)') ns,'trying to restart from from lwoniom.data'
         else
           input%try_bin = .false.
         end if
- 
+
       end select
     end do
 
     !> check if we are in restart mode and potentially can restart
-    if(input%try_bin)then
-      inquire(file='lwoniom.data',exist=ex)
-      if(ex) return !> we can leave the routine in this case. good luck.
-    endif
+    if (input%try_bin) then
+      inquire (file='lwoniom.data',exist=ex)
+      if (ex) return !> we can leave the routine in this case. good luck.
+    end if
 
     !> atom-wise definitions of fragments first
     call get_value(table,'fragment',child,requested=.false.)
@@ -218,10 +220,9 @@ contains  !> MODULE PROCEDURES START HERE
 
     !> lwONIOM MUST have fragment information
     if (input%maxfragments < 1) then
-        write (stderr,'("**ERROR** ",a)') 'lwONIOM requires definition of fragments!'
-        error stop
+      write (stderr,'("**ERROR** ",a)') 'lwONIOM requires definition of fragments!'
+      error stop
     end if
-
 
     !> then fragment-wise definition of layers (= which fragment belongs to which layer)
     !> note: input%layer is still stored atom-wise!
@@ -229,16 +230,24 @@ contains  !> MODULE PROCEDURES START HERE
     if (associated(child)) then
       call read_lwoniom_layer(error,input,child)
     else
-    !> If not present, each fragment is assumed to be a layer on its own (FALLBACK)
-       write(stdout,'(a,a)') ns,'No layer information provided; assuming fragments to be layers'
-       input%maxlayers = input%maxfragments
-       if(.not.allocated(input%layer)) allocate(input%layer( input%nat  )) 
-       do i=1,input%maxfragments
-         write(stdout,'(a,a)') clears,'fragment ',i,' --> layer ',i
-         do j=1,input%nat
-            if(input%frag(j) == i) input%layer(j) = i
-         enddo
-       enddo
+
+      !> If NOT present, each fragment is assumed to be a layer on its own (FALLBACK)
+      write (stdout,'(a,a)') ns,'No layer information provided; assuming fragments to be layers'
+      input%maxlayers = input%maxfragments
+      if (.not.allocated(input%layer)) allocate (input%layer(input%nat,input%maxlayers))
+      input%layer(:,:) = .false.
+      do i = input%maxfragments,1,-1 !> going from high-index to low-index!
+        write (stdout,'(a,a)') clears,'fragment ',i,' --> layer ',i
+        do j = 1,input%nat
+          if (input%frag(j,i)) input%layer(j,i) = .true.
+          !> in the fallback we are assuming hierarchical layer numbering!
+          !> I.e., all higher-index layer (i-1) members are also assumed to be members of layer i
+          if (i < input%maxfragments) then
+            input%layer(j,i) = input%layer(j,i).or.input%layer(j,i+1)
+          end if
+        end do
+      end do
+
     end if
 
     !> then fragment-wise definition of subprocesses to calculate energies and gradients
@@ -252,7 +261,6 @@ contains  !> MODULE PROCEDURES START HERE
       allocate (input%cmd(input%maxlayers),source=repeat(" ",200))
       call read_lwoniom_processcmd(error,input,child)
     end if
-
 
     !> then layer-wise definition of calculator IDs
     call get_value(table,'layerlevel',child,requested=.false.)
@@ -295,6 +303,7 @@ contains  !> MODULE PROCEDURES START HERE
     type(toml_array),pointer    :: arr
     character(len=:),allocatable :: key
     character(len=:),allocatable :: val
+    logical :: valbool
     integer,allocatable :: frag(:)
     logical,allocatable :: atlist(:)
 
@@ -317,7 +326,7 @@ contains  !> MODULE PROCEDURES START HERE
           call set_fragment(input,f,frag)
 
         else
-        !> otherwise, some string shortcuts can be defined
+          !> otherwise, some string shortcuts can be defined
 
           call get_value(table,key,val,stat=io3)
           if (io3 == 0) then
@@ -329,23 +338,29 @@ contains  !> MODULE PROCEDURES START HERE
               end do
               call set_fragment(input,f,frag)
             case default
-            !> atom list for defining ranges
+              !> atom list for defining ranges
 
-              call lwoniom_get_atlist( input%nat, atlist, val)
+              call lwoniom_get_atlist(input%nat,atlist,val)
               k = count(atlist,1)
               allocate (frag(k))
               k = 0
               do i = 1,input%nat
-                if(atlist(i))then
-                  k = k + 1
+                if (atlist(i)) then
+                  k = k+1
                   frag(k) = i
-                endif
+                end if
               end do
               call set_fragment(input,f,frag)
-            
+
             end select
           end if
         end if
+      else !> if the key is not a number, it might be accepted string
+        select case( key )
+        case ( 'dump' )
+          call get_value(table,key,valbool,stat=io3)
+          if(io3 == 0) input%dump_frag = valbool
+        end select
       end if
     end do
 
@@ -373,6 +388,7 @@ contains  !> MODULE PROCEDURES START HERE
     type(toml_array),pointer    :: arr
     character(len=:),allocatable :: key
     character(len=:),allocatable :: val
+    logical :: valbool
     integer,allocatable :: lay(:)
 
     !> iterate over keys (which should be integer numbers)
@@ -392,6 +408,12 @@ contains  !> MODULE PROCEDURES START HERE
           end do
           call set_layer(input,l,lay)
         end if
+      else !> if the key is not a number, it might be accepted string
+        select case( key )
+        case ( 'dump' )
+          call get_value(table,key,valbool,stat=io3)
+          if(io3 == 0) input%dump_layer = valbool
+        end select
       end if
     end do
 
@@ -460,23 +482,23 @@ contains  !> MODULE PROCEDURES START HERE
     character(len=:),allocatable :: key
     integer :: val
     integer,allocatable :: lay(:)
-    integer :: lvl 
+    integer :: lvl
 
     !> iterate over keys (which should be integer numbers)
     call table%get_keys(list)
     if (size(list) .ne. input%maxlayers) then
-      write(*,*) size(list),input%maxlayers 
+      write (*,*) size(list),input%maxlayers
       write (stderr,'("**ERROR** ",a)') 'Please define a level ID for ALL layers!'
       error stop
     end if
-    if(.not.allocated(input%layerlvl)) allocate(input%layerlvl( input%maxlayers ) )  
+    if (.not.allocated(input%layerlvl)) allocate (input%layerlvl(input%maxlayers))
     do ikey = 1,size(list)
       key = list(ikey)%key
       read (key,*,iostat=io) l
       if (io == 0) then
         if (allocated(lay)) deallocate (lay)
         call get_value(table,key,val,stat=io2)
-        if (io2 == 0) then  
+        if (io2 == 0) then
           input%layerlvl(l) = val
           write (stdout,'(a,a,i0,a,i0)') ns,'layer ',l,' associated with calculation level ',val
         end if
@@ -484,7 +506,6 @@ contains  !> MODULE PROCEDURES START HERE
     end do
 
   end subroutine read_lwoniom_layerlvl
-
 
   subroutine read_lwoniom_layerreplace(error,input,table)
 !*******************************************************
@@ -504,7 +525,7 @@ contains  !> MODULE PROCEDURES START HERE
     integer :: io,i,j,k,l,f,io2,io3,i1,i2
     integer :: ikey,childikey
     type(toml_key),allocatable :: list(:)
-    type(toml_key),allocatable :: childlist(:) 
+    type(toml_key),allocatable :: childlist(:)
     type(toml_array),pointer    :: arr
     character(len=:),allocatable :: key
     character(len=:),allocatable :: val
@@ -513,45 +534,43 @@ contains  !> MODULE PROCEDURES START HERE
 
     !> iterate over keys (which should be integer numbers)
     call table%get_keys(list)
-    if(.not.allocated(input%layerreplace)) &
-    &  allocate(input%layerreplace(118,input%maxlayers ), source = 0 )
+    if (.not.allocated(input%layerreplace)) &
+    &  allocate (input%layerreplace(118,input%maxlayers),source=0)
     do ikey = 1,size(list)
       key = list(ikey)%key
       read (key,*,iostat=io) l !> the key must be a number referring to a layer
-      if (io == 0 .and. l <= input%maxlayers) then
+      if (io == 0.and.l <= input%maxlayers) then
 
         call get_value(table,key,child,requested=.false.)
-        if (associated(child)) then  
-          call child%get_keys(childlist) !> the other keys are element symbols  
+        if (associated(child)) then
+          call child%get_keys(childlist) !> the other keys are element symbols
           do childikey = 1,size(childlist)
-            key = childlist(childikey)%key 
+            key = childlist(childikey)%key
             call get_value(child,key,val,stat=io2)
             if (io2 == 0) then
               i1 = zsym_to_at(key)
-              i2 = zsym_to_at(val)  
-              input%layerreplace( i1 , l ) = i2
-            endif
-          enddo 
-        endif
+              i2 = zsym_to_at(val)
+              input%layerreplace(i1,l) = i2
+            end if
+          end do
+        end if
       end if
     end do
 
     k = 0
-    do l=1,input%maxlayers
-      do i=1,118
-         j = input%layerreplace( i , l )
-         if( j > 0)then
-           k = k +1
-           write(stdout,'(4a,i0,2a)') ns,'replacing "',trim(PSE(i)),'" atoms in layer ',l, &
-           & ' with "',trim(PSE(j))//'"'
-         endif  
-      enddo
-    enddo
-    if(k < 1) deallocate(input%layerreplace)
+    do l = 1,input%maxlayers
+      do i = 1,118
+        j = input%layerreplace(i,l)
+        if (j > 0) then
+          k = k+1
+          write (stdout,'(4a,i0,2a)') ns,'replacing "',trim(PSE(i)),'" atoms in layer ',l, &
+          & ' with "',trim(PSE(j))//'"'
+        end if
+      end do
+    end do
+    if (k < 1) deallocate (input%layerreplace)
 
   end subroutine read_lwoniom_layerreplace
-
-
 
 #endif
 !========================================================================================!
@@ -567,18 +586,22 @@ contains  !> MODULE PROCEDURES START HERE
     integer,intent(in) :: f
     integer,intent(in) :: frag(:)
     integer :: i,j,k,c
-    if (f > input%maxfragments) input%maxfragments = f
+    logical,allocatable :: frag_tmp(:,:)
+    if (f > input%maxfragments) then
+      allocate (frag_tmp(input%nat,f),source=.false.)
+      do i = 1,input%maxfragments
+        frag_tmp(:,i) = input%frag(:,i)
+      end do
+      input%maxfragments = f
+      call move_alloc(frag_tmp,input%frag)
+    end if
     k = size(frag(:),1)
     write (stdout,'(a,a,i0)') ns,'setup fragment ',f
     c = 0
     do i = 1,k
       j = frag(i)
-      if (input%frag(j) > f) then
-        write (stdout,'(a,i0)') '**WARNING** atom ',j,' already defined in fragment ',input%frag(j)
-      else
-        c = c+1
-        input%frag(j) = f
-      end if
+      c = c+1
+      input%frag(j,f) = .true.
     end do
     write (stdout,'(a,i0,a)') clears,c,' atoms were selected'
   end subroutine set_fragment
@@ -595,17 +618,25 @@ contains  !> MODULE PROCEDURES START HERE
     integer,intent(in) :: l
     integer,intent(in) :: lay(:)
     integer :: i,j,k,m
-    if (l > input%maxlayers) input%maxlayers = l
+    logical,allocatable :: layer_tmp(:,:)
+    if (l > input%maxlayers) then
+      allocate (layer_tmp(input%nat,l),source=.false.)
+      do i = 1,input%maxlayers
+        layer_tmp(:,i) = input%layer(:,i)
+      end do
+      input%maxlayers = l
+      call move_alloc(layer_tmp,input%layer)
+    end if
     k = size(lay(:),1)
     do i = 1,k
       j = lay(i)
-      if (.not.any(input%frag(:) .eq. j)) then
+      if (.not.any(input%frag(:,j))) then
         write (stdout,'(a,i0,a,i0)') '**WARNING** no atoms associated with fragment ',j, &
         & ' while trying to add layer ',l
       else
         do m = 1,input%nat
-          if (input%frag(m) == j) then
-            input%layer(m) = l
+          if (input%frag(m,j)) then
+            input%layer(m,l) = .true.
           end if
         end do
         write (stdout,'(a,2(a,i0))') ns,'added fragment ',j,'  -->  layer ',l
@@ -680,7 +711,6 @@ contains  !> MODULE PROCEDURES START HERE
 
 !========================================================================================!
 
-
   subroutine lwoniom_get_atlist(nat,atlist,line,at)
 !******************************************************
 !* Analyze a string containing atom specifications.
@@ -726,25 +756,25 @@ contains  !> MODULE PROCEDURES START HERE
 !>--- analyze stuff
     do i = 1,ns
       atmp = trim(substr(i))
-      if(atmp.eq.'all')then
-         atlist(:) = .true.
-         exit
-      endif
-      if(index(atmp,'.').ne.0) cycle !> exclude floats
+      if (atmp .eq. 'all') then
+        atlist(:) = .true.
+        exit
+      end if
+      if (index(atmp,'.') .ne. 0) cycle !> exclude floats
       l = index(atmp,'-')
       if (l .eq. 0) then
-      !> single atom
+        !> single atom
         read (atmp,*,iostat=io) i1
         if (io /= 0) then
           i2 = zsym_to_at(atmp)
-          if(i2 /= 0 .and. present(at)) then
+          if (i2 /= 0.and.present(at)) then
 
-          endif
+          end if
         else
           atlist(i1) = .true.
         end if
       else
-      !> range of atoms 
+        !> range of atoms
         btmp = atmp(:l-1)
         read (btmp,*,iostat=io1) i1
         btmp = atmp(l+1:)
@@ -758,7 +788,7 @@ contains  !> MODULE PROCEDURES START HERE
         end if
       end if
     end do
-    deallocate(substr)
+    deallocate (substr)
   end subroutine lwoniom_get_atlist
 
 !========================================================================================!

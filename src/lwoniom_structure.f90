@@ -953,8 +953,7 @@ contains  !> MODULE PROCEDURES START HERE
 
     !> an identifier (position in the oniom list)
     read (bin) self%id
-    if(debug) write(*,*) self%id
-
+    if (debug) write (*,*) self%id
 
     !> layer tracker, one level of theory per layer
     read (bin) self%layer
@@ -962,7 +961,7 @@ contains  !> MODULE PROCEDURES START HERE
 
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*)  'reading self%child'
+      if (debug) write (*,*) 'reading self%child'
       read (bin) d1
       allocate (self%child(d1))
       do i = 1,d1
@@ -978,7 +977,7 @@ contains  !> MODULE PROCEDURES START HERE
     !> high level gradient
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*) 'reading self%gradient_high'
+      if (debug) write (*,*) 'reading self%gradient_high'
       read (bin) d1
       read (bin) d2
       allocate (self%gradient_high(d1,d2))
@@ -991,7 +990,7 @@ contains  !> MODULE PROCEDURES START HERE
     !> low level gradient
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*) 'reading self%gradient_low'
+      if (debug) write (*,*) 'reading self%gradient_low'
       read (bin) d1
       read (bin) d2
       allocate (self%gradient_low(d1,d2))
@@ -1004,7 +1003,7 @@ contains  !> MODULE PROCEDURES START HERE
     !> reconstruction gradient
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*) 'reading self%gradient_qq'
+      if (debug) write (*,*) 'reading self%gradient_qq'
       read (bin) d1
       read (bin) d2
       allocate (self%gradient_qq(d1,d2))
@@ -1018,7 +1017,7 @@ contains  !> MODULE PROCEDURES START HERE
     !> projected via Jacobian
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*) 'reading self%Jaco'
+      if (debug) write (*,*) 'reading self%Jaco'
       read (bin) d1
       read (bin) d2
       allocate (self%Jaco(d1,d2))
@@ -1058,7 +1057,7 @@ contains  !> MODULE PROCEDURES START HERE
     !integer,allocatable  :: at_high(:)
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*) 'reading self%at_high'
+      if (debug) write (*,*) 'reading self%at_high'
       read (bin) d1
       allocate (self%at_high(d1))
       do i = 1,d1
@@ -1069,7 +1068,7 @@ contains  !> MODULE PROCEDURES START HERE
     !integer,allocatable  :: at_low(:)
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*) 'reading self%at_low'
+      if (debug) write (*,*) 'reading self%at_low'
       read (bin) d1
       allocate (self%at_low(d1))
       do i = 1,d1
@@ -1080,7 +1079,7 @@ contains  !> MODULE PROCEDURES START HERE
     !real(wp),allocatable :: xyz(:,:)  !> Cartesian coordinates, also atomic units -> Bohr
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*) 'reading self%xyz'
+      if (debug) write (*,*) 'reading self%xyz'
       read (bin) d1
       read (bin) d2
       allocate (self%xyz(d1,d2))
@@ -1094,7 +1093,7 @@ contains  !> MODULE PROCEDURES START HERE
     !real(wp),allocatable :: grd_high(:,:)
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*) 'reading self%grd_high'
+      if (debug) write (*,*) 'reading self%grd_high'
       read (bin) d1
       read (bin) d2
       allocate (self%grd_high(d1,d2))
@@ -1108,7 +1107,7 @@ contains  !> MODULE PROCEDURES START HERE
     !real(wp),allocatable :: grd_low(:,:)
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*) 'reading self%grd_low'
+      if (debug) write (*,*) 'reading self%grd_low'
       read (bin) d1
       read (bin) d2
       allocate (self%grd_low(d1,d2))
@@ -1179,7 +1178,7 @@ contains  !> MODULE PROCEDURES START HERE
     !real(wp),allocatable :: linkgrd_high(:,:)  !> similar to grd, but for link atoms
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*) 'reading self%linkgrd_high'
+      if (debug) write (*,*) 'reading self%linkgrd_high'
       read (bin) d1
       read (bin) d2
       allocate (self%linkgrd_high(d1,d2))
@@ -1193,7 +1192,7 @@ contains  !> MODULE PROCEDURES START HERE
     !real(wp),allocatable :: linkgrd_low(:,:)  !> similar to grd, but for link atoms
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*) 'reading self%linkgrd_low'
+      if (debug) write (*,*) 'reading self%linkgrd_low'
       read (bin) d1
       read (bin) d2
       allocate (self%linkgrd_low(d1,d2))
@@ -1211,7 +1210,7 @@ contains  !> MODULE PROCEDURES START HERE
     !real(wp),allocatable :: pointc(:)
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*) 'reading self%pointc'
+      if (debug) write (*,*) 'reading self%pointc'
       read (bin) d1
       allocate (self%pointc(d1))
       do i = 1,d1
@@ -1222,7 +1221,7 @@ contains  !> MODULE PROCEDURES START HERE
     !real(wp),allocatable :: pointxyz(:,:)
     read (bin) bdum
     if (bdum) then
-      if(debug) write(*,*) 'reading self%pointxyz'
+      if (debug) write (*,*) 'reading self%pointxyz'
       read (bin) d1
       read (bin) d2
       allocate (self%pointxyz(d1,d2))

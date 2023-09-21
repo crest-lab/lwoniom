@@ -129,6 +129,8 @@ contains !> MODULE PROCEDURES START HERE
   subroutine write_example_toml
     integer :: ich,i
     open (newunit=ich,file='example.toml')
+
+    write (ich,'(a)') '# This file will set up a 5-center 3-layer ONIOM example'
     write (ich,'(a)') '# All data for lwONIOM must be contained in a corresponding [lwoniom]-block'
     write (ich,'(a)') '[lwoniom]'
     write (ich,'(a)') '# The systems total number of atoms must be specified'
@@ -141,22 +143,34 @@ contains !> MODULE PROCEDURES START HERE
     write (ich,*)
     write (ich,'(a)') '# Next, fragments must be defined on an by-atom basis'
     write (ich,'(a)') '# An ascending fragment numbering is assumed, i.e., fragment.1 will be the parent system'
-    write (ich,'(a)') "fragment.1 = 'all'   # fragment 1 contains all atoms"
+    write (ich,'(a)') "fragment.1 = 'all'   # fragment 1 contains all atoms (may be omitted)"
     write (ich,'(a)') 'fragment.2 = [1,2]   # fragment 2 contains atoms 1 (Cl) and 2 (Al)'
     write (ich,'(a)') 'fragment.3 = "29-34" # fragment 3, atom lists can be provided as a string'
+    write (ich,'(a)') 'fragment.4 = "3-8"'
+    write (ich,'(a)') 'fragment.5 = "22-27"'
+    write (ich,'(a)') 'fragment.6 = "11,13-16,19"'
+    write (ich,'(a)') 'fragment.dump = false  # to let lwONIOM write all fragments to xyz files set this to true'
     write (ich,*)
     write (ich,'(a)') '# Finally, layers are defined on an by-fragment basis'
     write (ich,'(a)') '# As with the fragments, layers are given in ascending order'
-    write (ich,'(a)') '# One layer can contain multiple (non-overlapping) fragments in MC-ONIOM, which is not the case here'
+    write (ich,'(a)') '# One layer can contain multiple (non-overlapping) fragments in MC-ONIOM, which are fragments 3 to 6 here'
+    write (ich,'(a)') '# the important point here being "NON-OVERLAPPING"'
     write (ich,'(a)') 'layer.1 = [1]  # layer 1 contains only fragment 1'
-    write (ich,'(a)') 'layer.2 = [2,3]  # layer 2 contains only fragments 2 and 3'
+    write (ich,'(a)') 'layer.2 = [2]  # layer 2 contains only fragment 2'
+    write (ich,'(a)') 'layer.3 = [3,4,5,6]  # layer 2 contains fragments 3 to 6'
+    write (ich,'(a)') 'layer.dump = false # to let lwONIOM write xyz coordinates for each layer set this to true'
 
     write (ich,*)
     write (ich,'(a)') '# For application in other programs it is typically necessary to'
-    write (ich,'(a)') '# tie each layer to a calculation level or some ID'
+    write (ich,'(a)') '# tie each layer to a calculation level or some ID used in your calculator'
+    write (ich,'(a)') "# lwONIOM on its own doesn't do anything with this number"
     write (ich,'(a)') 'layerlevel.1 = 1  # tie layer 1 to ID 1'
-    write (ich,'(a)') 'layerlevel.2 = 2  # tie layer 2 to ID 2 (fragment 2 and 3)'
- 
+    write (ich,'(a)') 'layerlevel.2 = 2  # tie layer 2 to ID 2 (fragment 2)'
+    write (ich,'(a)') 'layerlevel.3 = 3  # tie layer 3 to ID 3 (fragment 3 to 6)'
+
+    write (ich,*)
+    write (ich,'(a)') '# lwONIOM can writ and read a binary file containing the setup (instead of re-generating it)'
+    write (ich,'(a)') 'restart = false  # to use the restart binary file set this to true'
 
     close (ich)
   end subroutine write_example_toml

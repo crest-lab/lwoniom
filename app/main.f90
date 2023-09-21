@@ -142,7 +142,7 @@ program lwoniom_app
     write(stdout,*)
 
 !>--- dump xyz fragments
-    if (dumpfrags) then
+    if (dumpfrags .and. .not.inp%dump_frag) then
       write(stdout,'(a,a)') namespace,'dumping all fragments ...'
       do i=1,dat%nfrag
        write(stdout,'(1x,a,i0,a)',advance='no') 'fragment.',i,'.xyz'

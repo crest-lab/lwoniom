@@ -61,28 +61,26 @@ contains  !> MODULE PROCEDURES START HERE
     integer,allocatable :: at(:),bond(:,:)
     logical :: ex,success
 
-    if(inp%try_bin)then
+    if (inp%try_bin) then
       call dat%read_bin(success)
-      write(stdout,'("lwONIOM> ",a,l4)') 'successfully read lwoniom.data?  ',success
-      if(success) return
-    endif
-
+      write (stdout,'("lwONIOM> ",a,l4)') 'successfully read lwoniom.data?  ',success
+      if (success) return
+    end if
 
     if (allocated(inp%xyz).and. &
         allocated(inp%layer).and.allocated(inp%frag)) then
 
       allocate (at(inp%nat),source=0)
-      if(allocated(inp%zsym))then
-      do i = 1,inp%nat
-        at(i) = zsym_to_at(inp%zsym(i))
-      end do
-      else if(allocated(inp%at))then
+      if (allocated(inp%zsym)) then
+        do i = 1,inp%nat
+          at(i) = zsym_to_at(inp%zsym(i))
+        end do
+      else if (allocated(inp%at)) then
         at = inp%at
       else
         write (stderr,'("**ERROR** ",a)') "Required lwoniom_input atom type info missing!"
         error stop
-      endif
-
+      end if
 
       if (.not.allocated(inp%wbo)) then
         !> without bonding topology (will be set up from covalent radii)
@@ -101,63 +99,89 @@ contains  !> MODULE PROCEDURES START HERE
         &                 inp%layer,inp%frag,bond)
 
       end if
-      deallocate(at)
-
+      !deallocate (at)
 
       !> set up mapping of theory levels
-      if(allocated(inp%layerlvl))then
-         dat%ncalcs = 2*dat%nfrag - 1
-         allocate(dat%calcids(2,dat%nfrag), source = 0)
-         do i=1,dat%nfrag
-           j = dat%fragment(i)%layer
-           dat%calcids(1,i) = inp%layerlvl(j) !> high level
-           p = dat%fragment(i)%parent
-           if(p .ne. 0)then
-             j = dat%fragment(p)%layer
-             dat%calcids(2,i) = inp%layerlvl(j) !> low level, same layer as parent
-           else
-             dat%calcids(2,i) = dat%calcids(1,i) !> highest layer has only one level
-           endif
-         enddo
-       endif
+      if (allocated(inp%layerlvl)) then
+        dat%ncalcs = 2*dat%nfrag-1
+        allocate (dat%calcids(2,dat%nfrag),source=0)
+        do i = 1,dat%nfrag
+          j = dat%fragment(i)%layer
+          dat%calcids(1,i) = inp%layerlvl(j) !> high level
+          p = dat%fragment(i)%parent
+          if (p .ne. 0) then
+            j = dat%fragment(p)%layer
+            dat%calcids(2,i) = inp%layerlvl(j) !> low level, same layer as parent
+          else
+            dat%calcids(2,i) = dat%calcids(1,i) !> highest layer has only one level
+          end if
+        end do
+      end if
 
-       !> atom replacement in layers?
-       if(allocated(inp%layerreplace))then
-         dat%replace_at = .true.
-         do i=1,dat%nlayer
-           if(.not.any(inp%layerreplace(:,i) > 0)) cycle
-           do j=1,dat%nfrag
-              k = dat%fragment(j)%layer
-              if( i == k )then
-                do ii=1,size(inp%layerreplace,1)
-                  kk = inp%layerreplace(ii,i) 
-                  if( kk > 0)then
-                    !write(*,*) '#####',j,ii,'-->',kk 
-                    do jj=1,dat%fragment(j)%nat
-                      if(dat%fragment(j)%at(jj) == ii)then
-                        dat%fragment(j)%at(jj) = kk
-                      endif
-                    enddo
-                  endif
-                enddo
-                !write(*,*) dat%fragment(j)%at
-              endif
-           enddo
-         enddo 
-       endif
+      !> atom replacement in layers?
+      if (allocated(inp%layerreplace)) then
+        dat%replace_at = .true.
+        do i = 1,dat%nlayer
+          if (.not.any(inp%layerreplace(:,i) > 0)) cycle
+          do j = 1,dat%nfrag
+            k = dat%fragment(j)%layer
+            if (i == k) then
+              do ii = 1,size(inp%layerreplace,1)
+                kk = inp%layerreplace(ii,i)
+                if (kk > 0) then
+                  !write(*,*) '#####',j,ii,'-->',kk
+                  do jj = 1,dat%fragment(j)%nat
+                    if (dat%fragment(j)%at(jj) == ii) then
+                      dat%fragment(j)%at(jj) = kk
+                    end if
+                  end do
+                end if
+              end do
+              !write(*,*) dat%fragment(j)%at
+            end if
+          end do
+        end do
+      end if
 
+      inquire (file='lwoniom.data',exist=ex)
+      if (inp%try_bin) then
+        if (.not.ex) then
+          write (stdout,'("lwONIOM> ",a)') 'writing lwONIOM model to "lwoniom.data" binary file ... '
+          flush (stdout)
+          call dat%dump_bin
+        else
+          write (stdout,'("lwONIOM> ",a)') 'lwONIOM model file "lwoniom.data" already exists and will not be overwritten.'
+        end if
+      end if
 
-       write(stdout,'("lwONIOM> ",a)') 'writing lwONIOM model to "lwoniom.data" binary file ... '
-       flush(stdout)  
-       call dat%dump_bin
-       write(stdout, '("lwONIOM> ",a)') 'done.'
+      write (stdout,'("lwONIOM> ",a)') 'setup done.'
   
+      !> some additional stuff that can be done
+      if(inp%dump_frag)then
+       write (stdout,'("lwONIOM> ",a)') 'dumping fragment xyz files'
+       do i=1,dat%nfrag
+         write(stdout,'(1x,a,i0,a)',advance='no') 'fragment.',i,'.xyz'
+       enddo
+       write(stdout,*)
+       call dat%dump_fragments()
+      endif
 
+      if(inp%dump_layer)then
+       write (stdout,'("lwONIOM> ",a)') 'dumping layer xyz files'
+       do i=1,dat%nlayer
+         write(stdout,'(1x,a,i0,a)',advance='no') 'layer.',i,'.xyz'
+       enddo
+       write(stdout,*)
+       call dat%dump_layers(at,inp%xyz)
+      endif
+
+  
     else
       write (stderr,'("**ERROR** ",a)') "Required lwoniom_input setup info missing!"
       return
     end if
-
+    if(allocated(at)) deallocate(at)
+    call inp%deallocate()
   end subroutine lwoniom_new_calculator_inp
 
 !========================================================================================!

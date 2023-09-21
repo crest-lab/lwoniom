@@ -40,7 +40,7 @@ module lwoniom_setup
 
     !> number of layers
     integer :: nlayer = 0
-    integer,allocatable :: layer(:)
+    logical,allocatable :: layer(:,:)
 
     !> number of fragments
     integer :: nfrag = 0
@@ -64,6 +64,7 @@ module lwoniom_setup
     procedure :: deallocate => lwoniom_data_deallocate
     procedure :: add_fragment => lwoniom_add_fragment
     procedure :: dump_fragments => lwoniom_dump_fragments
+    procedure :: dump_layers => lwoniom_dump_layers
     procedure :: update => lwoniom_update_fragments
     procedure :: dump_bin => lwoniom_dump_bin
     procedure :: read_bin => lwoniom_read_bin
@@ -116,11 +117,12 @@ contains  !> MODULE PROCEDURES START HERE
   end subroutine print_lwoniom_info
 
 !========================================================================================!
+
   subroutine lwoniom_initialize(nat,at,xyz,dat, &
   &                 layer,fragment,bond,       &
   &                 print,verbose,iunit,iostat)
 !******************************************************************
-!* This routine sets up the lwoniom_data object and handles
+!* This routine SETS UP the lwoniom_data object "dat" and handles
 !* the partitioning of the whole system into different layers.
 !*
 !* It requires input coordinates for the entire system, as
@@ -132,8 +134,9 @@ contains  !> MODULE PROCEDURES START HERE
 !*
 !*  B) If the "layer" and the "fragment" arrays are provided,
 !*     one layer can have mutliple fragments (MC-ONIOM).
-!*     However, the array "bond" must also be present in this case
 !*
+!* The array "bond" can be present to determine connectivity,
+!* otherwise this is calculated from covalent radii
 !* This routine needs calling only once, at the beginning
 !******************************************************************
     character(len=*),parameter :: source = 'lwoniom_initialize'
@@ -141,8 +144,9 @@ contains  !> MODULE PROCEDURES START HERE
     integer,intent(in) :: nat          !> number of atoms
     integer,intent(in) :: at(nat)      !> atom number for each atom
     real(wp),intent(in) :: xyz(3,nat)  !> Cartesian coordinates for each atom
-    integer,intent(in) :: layer(nat)   !> layer instruction for each atom
-    integer,intent(in),optional :: fragment(nat) !> subsystem instruction (for MC-ONIOM)
+    !integer,intent(in) :: layer(nat)   !> layer instruction for each atom
+    logical,intent(in) :: layer(:,:)   !> layer instruction
+    logical,intent(in),optional :: fragment(:,:) !> subsystem instruction (for MC-ONIOM)
     integer,intent(in),optional :: bond(nat,nat) !> bonding/interaction information
     logical,intent(in),optional  :: print
     logical,intent(in),optional  :: verbose
@@ -152,13 +156,14 @@ contains  !> MODULE PROCEDURES START HERE
     type(lwoniom_data),intent(inout) :: dat
     !> LOCAL
     type(structure_data) :: tmp
-    integer,allocatable :: fragment_tmp(:)
-    integer,allocatable :: layer_tmp(:)
+    logical,allocatable :: fragment_tmp(:,:)
+    !integer,allocatable :: layer_tmp(:)
+    logical,allocatable :: layer_tmp(:,:)
     integer,allocatable :: bond_tmp(:,:)
     integer :: ich,io,myunit
     logical :: ex,okbas,pr,pr2
     logical :: exitRun
-    integer :: maxf,nroot
+    integer :: maxf,nroot,nlayer,nfrag
     integer,allocatable ::   indexf(:),parent(:)
     integer :: i,j,k
 
@@ -185,25 +190,34 @@ contains  !> MODULE PROCEDURES START HERE
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! SUBSYTEM SETUP
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    allocate (fragment_tmp(nat),layer_tmp(nat),source=0)
+    nlayer = size(layer,2)
     if (present(fragment)) then
-      fragment_tmp(:) = fragment(:)
+      nfrag = size(fragment,2)
+      if (debug) write (*,*) 'fragment present',nfrag
+      allocate (fragment_tmp(nat,nfrag),source=.false.)
+      fragment_tmp(:,:) = fragment(:,:)
     else
-      fragment_tmp(:) = 0
+      nfrag = nlayer
+      allocate (fragment_tmp(nat,nfrag),source=.false.)
+      fragment_tmp(:,:) = layer(:,:)
     end if
-    layer_tmp(:) = layer(:)
+    allocate (layer_tmp(nat,nlayer),source=.false.)
+    layer_tmp(:,:) = layer(:,:)
     allocate (indexf(nat))
-    if (debug) then
-      write (*,*) present(fragment)
-      do i = 1,nat
-        write (*,*) fragment_tmp(i),layer_tmp(i)
-      end do
-    end if
+    do i = 1,nfrag
+      if (debug) write (*,*) 'atoms in fragment',i
+      if (debug) then
+        do j = 1,nat
+          if (fragment_tmp(j,i)) write (*,'(1x,i0)',advance='no') j
+        end do
+        write (*,*)
+      end if
+    end do
 
     !> determine maxf and indexf, i.e. the number of "nodes"
     !> and the mapping which atom belongs to which node
     call count_fragments(nat,layer_tmp,fragment_tmp,maxf,indexf)
-    dat%nlayer = maxval(layer_tmp,1)
+    dat%nlayer = nlayer
     if (debug) then
       write (*,*) 'maxf',maxf
       write (*,*) 'nlayer',dat%nlayer
@@ -224,14 +238,14 @@ contains  !> MODULE PROCEDURES START HERE
 ! from the connectivity determine the tree structure
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     allocate (parent(maxf))
-    if (maxf .eq. maxval(layer_tmp,1)) then
+    if (maxf .eq. nlayer) then
       !> one fragment per layer is easy
       call construct_tree_ONIOM_classic(maxf,parent)
 
     else if (allocated(bond_tmp)) then
       if (debug) write (*,*) 'creating MC-ONIOMn tree ...'
-      call construct_tree_ONIOM_multicenter(nat,layer_tmp,indexf,bond_tmp,maxf,parent)
-
+      call construct_tree_ONIOM_multicenter(nat,layer_tmp,fragment_tmp,bond_tmp,maxf,parent)
+      if (debug) write (*,*) 'parent',parent
     else
       write (stderr,'(a)') "**ERROR** 'bond' array not provided in call to "//source
       error stop
@@ -246,7 +260,8 @@ contains  !> MODULE PROCEDURES START HERE
     !> them into the fragment list
     do i = 1,maxf
       call tmp%deallocate()
-      call fragment_set_atoms_ONIOM(nat,at,xyz,layer_tmp,maxf,indexf,parent,i,tmp)
+      if (parent(i) < 0) cycle !> safety
+      call fragment_set_atoms_ONIOM(nat,at,xyz,layer_tmp,maxf,fragment_tmp,parent,i,tmp)
       call dat%add_fragment(tmp)
     end do
     !> and connect them in the parent-child relations
@@ -282,6 +297,7 @@ contains  !> MODULE PROCEDURES START HERE
       iostat = io
     end if
 
+    if (allocated(layer_tmp)) deallocate (layer_tmp)
     if (allocated(fragment_tmp)) deallocate (fragment_tmp)
     if (allocated(indexf)) deallocate (indexf)
   end subroutine lwoniom_initialize
@@ -420,19 +436,18 @@ contains  !> MODULE PROCEDURES START HERE
   subroutine count_fragments(nat,layer,fragment,maxf,indexf)
 !**********************************************************************
 !* Given the two tracking arrays "layer" and "fragment",
-!* this routine computes the maximum number of fragments (subsets)
+!* this routine returns the maximum number of fragments (subsets)
 !* and enumerates the atoms accordingly.
-!* it also repairs the indices, if there are any errors
 !**********************************************************************
     implicit none
     character(len=*),parameter :: source = 'lwoniom_count_fragments'
     !> INPUT
     integer,intent(in) :: nat
-    integer,intent(inout) :: layer(nat)
-    integer,intent(in) :: fragment(nat)
+    logical,intent(inout) :: layer(:,:)
+    logical,intent(inout) :: fragment(:,:)
     !> OUTPUT
     integer,intent(out) :: maxf
-    integer,intent(out) :: indexf(nat)
+    integer,intent(out) :: indexf(nat) !> track highest fragment id for each atom
     !> LOCAL
     integer :: i,j,k,l
     integer :: maxl,ninlayer,minl,minf
@@ -445,40 +460,31 @@ contains  !> MODULE PROCEDURES START HERE
     allocate (tmp(nat))
 
     !> iterate through the layers and repair indices
-    minl = minval(layer,1)
-    layer(:) = layer(:)-minl+1 !> set lowest layer index to 1
-    maxl = maxval(layer,1)
-    do i = 1,maxval(layer,1)
-      if (i > maxl) cycle !> safety, since maxl could decrease
-      !> check if there are objects in the layer
-      !> if the layer is empty, modify the layer tracking accordingly
-      do while (count(layer(:) .eq. i) <= 0.and.i <= maxl)
-        ninlayer = count(layer(:) .eq. i)
-        if (ninlayer <= 0.and.i <= maxl) then
-          maxl = maxl-1
-          do j = 1,nat
-            if (layer(j) >= i) layer(j) = layer(j)-1
-          end do
-          cycle
-        end if
-      end do
-    end do
-    maxl = maxval(layer,1)
+    maxf = size(fragment,2)
+    maxl = size(layer,2)
+    if (debug) write (*,*) 'maxf',maxf,'maxl',maxl
+    if (maxl > maxf) then
+      write (stderr,'(a)') "**ERROR** Can't have more layers than subsystems!"
+      write (stderr,'(10x,a)') 'This can occur if there is exact overlap between two layers.'
+      error stop
+    end if
 
-    !> classical ONIOM case, one subsystem per layer
-    if (all(fragment(:) .eq. 0)) then
-      indexf(:) = layer(:)
-      maxf = maxl
-    else
-      indexf(:) = fragment(:)
-      minf = minval(fragment,1)
-      indexf(:) = indexf(:)-minf+1
-      maxf = maxval(indexf,1)
-      if (maxl > maxf) then
-        write (stderr,'(a)') "**ERROR** Can't have more layers than subsystems!"
-        write (stderr,'(10x,a)') 'This can occur if there is exact overlap between two layers.'
-        error stop
+    !> classical ONIOM case, one subsystem per layer (set up here)
+    !> MC-ONIOM case, just counting stuff
+    minf = maxf
+    do k = 1,maxf
+      j = count(fragment(:,k),1)
+      if (j == 0) then
+        minf = minf-1
+        write (stderr,'(a,i0)') "**ERROR** Empty fragment detected: fragment ",k
+      else
+        do l = 1,nat
+          if (fragment(l,k)) indexf(l) = k
+        end do
       end if
+    end do
+    if (maxf > minf) then
+      error stop
     end if
 
     deallocate (tmp)
@@ -501,7 +507,7 @@ contains  !> MODULE PROCEDURES START HERE
 
 !========================================================================================!
 
-  subroutine construct_tree_ONIOM_multicenter(nat,layer,indexf,bond,maxf,parent)
+  subroutine construct_tree_ONIOM_multicenter(nat,layer,fragment,bond,maxf,parent)
 !****************************************************************
 !* Set layer hierarchy for MC-ONIOMn schemes, which needs to be
 !* done recursively.
@@ -509,42 +515,81 @@ contains  !> MODULE PROCEDURES START HERE
     implicit none
     !> INPUT
     integer,intent(in) :: nat
-    integer,intent(in) :: layer(nat)
-    integer,intent(in) :: indexf(nat)
+    logical,intent(in) :: layer(:,:)
+    logical,intent(in) :: fragment(:,:)
     integer,intent(in) :: bond(nat,nat)
     integer,intent(in) :: maxf
     !> OUTPUT
     integer,intent(out) :: parent(maxf)
     !> LOCAL
+    integer :: parentid
     integer :: maxl,thislayer
-    integer :: i,j,k,l
-    parent(:) = 0
-    maxl = maxval(layer,1)
-    !> go through the layers reversely (i.e. start with the innermost layer)
-    do i = maxl,1,-1
-      !> go through substructures
-      do j = 1,maxf
-        do k = 1,nat
-          if (indexf(k) == j.and.layer(k) == i) then
-            !> found an atom belonging to fragment j and layer i, now check to what
-            !> upper layer/fragment it is connected.
-            !> It should be connected to at least one atom in the next higher layer
-            !> because otherwise there is perfect overlap between fragments
-            do l = 1,nat
-              if (abs(bond(l,k)) > 0.and.layer(l) == i-1) then
-                parent(j) = indexf(l)
-              end if
-            end do
-          else
-            cycle
+    integer :: i,j,k,l,nj,nk
+    logical :: yes
+    parent(:) = -1
+    maxl = size(layer,2)
+    !> check which of the fragments contains all atoms
+    !> there must be exactly ONE such fragment which is our root
+    parentid = 0
+    do i = 1,maxf
+      k = count(fragment(:,i),1)
+      if (parentid == 0.and.k == nat) then
+        if (debug) write (*,*) 'parent id ',i
+        parentid = i
+        parent(i) = 0
+      end if
+      !if(debug) write(*,*) 'atoms in fragment',i
+      !if(debug)then
+      !   do j=1,nat
+      !     if(fragment(j,i)) write(*,'(1x,i0)',advance='no') j
+      !   enddo
+      !   write(*,*)
+      !endif
+    end do
+
+    !> go through the fragments recursively (i.e. start with the highest ID)
+    jloop: do j = maxf,2,-1
+      if (all(.not.fragment(:,j))) then
+        !> exclude empty fragments (there shouldn't be any at this point)
+        if (debug) write (*,*) 'something is wrong, empty fragment',j
+        parent(j) = -1
+        cycle
+      end if
+      !> check all next lower-ID fragments.
+      !> the next-lower-ID fragment that contains all the atoms of this fragment
+      !> must be the parent
+      nj = count(fragment(:,j),1)
+      kloop: do k = j-1,1,-1
+        yes = .true.
+        if (debug) write (*,*) 'comparing fragment',j,'with',k
+        nk = count(fragment(:,k),1)
+        !> exlude smaller fragments
+        if (nk < nj) cycle kloop
+        if (all(fragment(:,j).eqv.fragment(:,k))) then
+          !> these setups are inefficient, print a warning
+          write (stdout,'(a,i0,1x,i0)') '**WARNING** exactly overlapping fragments: ',j,k
+        end if
+        do l = 1,nat
+          if (fragment(l,j)) then
+            if (debug) write (*,*) '   atom ',l
+            yes = yes.and.fragment(l,k)
           end if
         end do
-      end do
+        if (yes) then
+          parent(j) = k
+          cycle jloop
+        end if
+      end do kloop
+    end do jloop
+    do i = 1,maxf
+      if (parent(i) == -1) then
+        write (stdout,'(a,i0,a)') '**WARNING** fragment ',i,' not in MC-ONIOM tree!'
+      end if
     end do
   end subroutine construct_tree_ONIOM_multicenter
 
 !========================================================================================!
-  subroutine fragment_set_atoms_ONIOM(nat,at,xyz,layer,maxf,indexf,parent,k,frag)
+  subroutine fragment_set_atoms_ONIOM(nat,at,xyz,layer,maxf,fragment,parent,k,frag)
 !**************************************************************************
 !* This subroutine creates a structure_data object frag for the
 !* k-th fragment index in an ONIOM setup, based on the present information
@@ -554,9 +599,9 @@ contains  !> MODULE PROCEDURES START HERE
     integer,intent(in) :: nat
     integer,intent(in) :: at(nat)
     real(wp),intent(in) :: xyz(3,nat)
-    integer,intent(in) :: layer(nat)
+    logical,intent(in) :: layer(:,:)
     integer,intent(in) :: maxf
-    integer,intent(in) :: indexf(nat)
+    logical,intent(in) :: fragment(:,:)
     integer,intent(in) :: parent(maxf)
     integer,intent(in) :: k
     type(structure_data),intent(out) :: frag
@@ -572,15 +617,11 @@ contains  !> MODULE PROCEDURES START HERE
       error stop
     end if
 
-    !> add all atoms that belong to k anyways
+    !> add all atoms that belong to k
     do i = 1,nat
-      if (indexf(i) == k) then
-        taken(i) = .true.
-        layerk = layer(i)
-      end if
+      taken(i) = fragment(i,k)
     end do
-    !> and then go through tree recursively
-    call recursive_take(nat,maxf,parent,indexf,k,taken)
+    layerk = match_layer(k,layer,fragment)
 
     !> determine how many atoms there are in the fragment total
     natf = count(taken(:),1)
@@ -607,31 +648,10 @@ contains  !> MODULE PROCEDURES START HERE
     end do
 
     deallocate (taken)
-  contains
-    recursive subroutine recursive_take(nat,maxf,parent,indexf,k,taken)
-      implicit none
-      integer,intent(in) :: k
-      integer,intent(in) :: nat
-      integer,intent(in) :: maxf
-      integer,intent(in) :: indexf(nat)
-      integer,intent(in) :: parent(maxf)
-      logical,intent(inout) :: taken(nat)
-      integer :: i,j
-      do i = 1,maxf
-        if (parent(i) .eq. k) then
-          do j = 1,nat
-            if (indexf(j) == i) then
-              taken(j) = .true.
-            end if
-          end do
-          call recursive_take(nat,maxf,parent,indexf,i,taken)
-        end if
-      end do
-    end subroutine recursive_take
   end subroutine fragment_set_atoms_ONIOM
 
 !========================================================================================!
-  subroutine fragment_set_atoms_QMMM(nat,at,xyz,layer,maxf,indexf,parent,k,frag)
+  subroutine fragment_set_atoms_QMMM(nat,at,xyz,layer,maxf,fragment,parent,k,frag)
 !**************************************************************************
 !* This subroutine creates a structure_data object frag for the
 !* k-th fragment index in an QMMM setup, based on the present information
@@ -641,14 +661,14 @@ contains  !> MODULE PROCEDURES START HERE
     integer,intent(in) :: nat
     integer,intent(in) :: at(nat)
     real(wp),intent(in) :: xyz(3,nat)
-    integer,intent(in) :: layer(nat)
+    logical,intent(in) :: layer(:,:)
     integer,intent(in) :: maxf
-    integer,intent(in) :: indexf(nat)
+    logical,intent(in) :: fragment(:,:)
     integer,intent(in) :: parent(maxf)
     integer,intent(in) :: k
     type(structure_data),intent(out) :: frag
     logical,allocatable :: taken(:)
-    integer :: i,natf,n,layerk
+    integer :: i,natf,n,layerk,j,l
 
     call frag%deallocate()
     allocate (taken(nat),source=.false.)
@@ -659,11 +679,18 @@ contains  !> MODULE PROCEDURES START HERE
       error stop
     end if
 
-    !> add all atoms that belong to k
+    !> add all atoms that belong to the fragment
     do i = 1,nat
-      if (indexf(i) == k) then
-        taken(i) = .true.
-        layerk = layer(i)
+      taken(i) = fragment(i,k)
+    end do
+    layerk = match_layer(k,layer,fragment)
+
+    !> remove all atoms belonging to children (QMMM is additive compared to ONIOM)
+    do i = 1,maxf
+      if (parent(i) == k) then
+        do j = 1,nat
+          if (fragment(j,i)) taken(j) = .false.
+        end do
       end if
     end do
 
@@ -695,6 +722,42 @@ contains  !> MODULE PROCEDURES START HERE
   end subroutine fragment_set_atoms_QMMM
 
 !========================================================================================!
+
+  function match_layer(f,layer,fragment) result(l)
+!**************************************************
+!* given the layer and fragment mapping,
+!* determine which layer fragment f must belong to
+!**************************************************
+    implicit none
+    !> INPUT
+    integer,intent(in) :: f !> the fragment-ID
+    logical,intent(in) :: layer(:,:) !> the layer-atom mapping
+    logical,intent(in) :: fragment(:,:) !> the fragment-atom mapping
+    !> OUTPUT
+    integer :: l
+    !> LOCAL
+    integer :: i,j,k
+    integer :: maxl,maxf,nat
+    logical :: yes
+    l = 0 !> could always be the root
+    nat = size(layer,1)
+    maxf = size(fragment,2)
+    maxl = size(layer,2)
+    do i = maxl,1,-1 !> go through layers, lowest (innermost) to highest (outermost)
+      yes = .true.
+      do j = 1,nat
+        if (fragment(j,f)) then !> check if all atoms of the fragment belong to layer i
+          yes = yes.and.layer(j,i)
+        end if
+      end do
+      if (yes) then !> the first matching is returned
+        l = i
+        exit
+      end if
+    end do
+  end function match_layer
+
+!========================================================================================!
   subroutine lwoniom_dump_fragments(self,xyz)
 !****************************************************
 !* Dump all fragments as .xyz
@@ -708,6 +771,47 @@ contains  !> MODULE PROCEDURES START HERE
       call self%fragment(i)%dump_fragment(xyz)
     end do
   end subroutine lwoniom_dump_fragments
+
+
+!========================================================================================!
+  subroutine lwoniom_dump_layers(self,at,xyz)
+!****************************************************
+!* Dump all layers as .xyz
+!*****************************************************
+    implicit none
+    class(lwoniom_data) :: self
+    integer,intent(in) :: at(:)
+    real(wp),intent(in) :: xyz(:,:) !> in Angstroem
+    integer :: i,j,k,nat,natlay,l,ich
+    logical,allocatable :: taken(:)
+    character(len=40) :: atmp
+    nat = size(xyz,2)
+    allocate(taken(nat))
+    do i=1,self%nlayer
+       taken = .false.
+       do j=1,self%nfrag
+         if(self%fragment(j)%layer == i)then
+           do k=1,self%fragment(j)%nat
+             l = self%fragment(j)%opos(k)
+             taken(l) = .true.
+           enddo
+         endif
+       enddo
+       natlay = count(taken(:),1)
+       write(atmp,'(i0)') i 
+       open(newunit=ich,file='layer.'//trim(atmp)//'.xyz')
+       write(ich,*) natlay
+       write(ich,*)
+       do j=1,nat
+         if(taken(j))then
+           write(ich,'(a4,3f25.15)') PSE(at(j)),xyz(1:3,j)
+         endif
+       enddo
+       close(ich)
+    enddo
+    deallocate(taken)
+  end subroutine lwoniom_dump_layers
+
 
 !========================================================================================!
 
@@ -751,9 +855,13 @@ contains  !> MODULE PROCEDURES START HERE
     write (bin) bdum
     if (bdum) then
       d1 = size(self%layer,1)
+      d2 = size(self%layer,2)
       write (bin) d1
+      write (bin) d2
       do i = 1,d1
-        write (bin) self%layer(i)
+        do j = 1,d2
+          write (bin) self%layer(i,j)
+        end do
       end do
     end if
 
@@ -857,9 +965,12 @@ contains  !> MODULE PROCEDURES START HERE
     read (bin) bdum
     if (bdum) then
       read (bin) d1
-      allocate (self%layer(d1))
+      read (bin) d2
+      allocate (self%layer(d1,d2))
       do i = 1,d1
-        read (bin) self%layer(i)
+        do j = 1,d2
+          read (bin) self%layer(i,j)
+        end do
       end do
     end if
 
@@ -873,7 +984,7 @@ contains  !> MODULE PROCEDURES START HERE
     if (bdum) then
       read (bin) d1
       allocate (self%fragment(d1))
-      !write(*,*) 'read fragments',d1 
+      !write(*,*) 'read fragments',d1
       do i = 1,d1
         call self%fragment(i)%read_bin(bin)
         call self%fragment(i)%dump_fragment()
