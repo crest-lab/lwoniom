@@ -42,15 +42,20 @@ module lwoniom_structures
     integer,allocatable :: child(:)
     !> energies for level of theory at current layer (high) and parent layer (low)
     real(wp) :: energy_high = 0.0_wp  !> high = QM
-    real(wp) :: energy_low = 0.0_wp   !> low  = MM/CC
+    real(wp) :: energy_low = 0.0_wp   !> low  = MM/CG
     real(wp) :: energy_qq = 0.0_wp
     integer :: truenat
-    real(wp),allocatable :: gradient_high(:,:) !> gradient in the original system's dimension
-    real(wp),allocatable :: gradient_low(:,:)  !> gradient in the original system's dimension
-    real(wp),allocatable :: gradient_qq(:,:)
+    !> gradient storage 
+    real(wp),allocatable :: gradient_high(:,:) !> gradient in the original system's basis
+    real(wp),allocatable :: gradient_low(:,:)  !> gradient in the original system's basis
+    real(wp),allocatable :: gradient_qq(:,:)   !> constructed gradient 
+    !> Hessian storage. Note: all Hessians are stored in 1D packed form
+    real(wp),allocatable :: Hss_high(:) 
+    real(wp),allocatable :: Hss_low(:)  
+    real(wp),allocatable :: Hss_qq(:)   
     !> projected via Jacobian
     real(wp),allocatable :: Jaco(:,:)
-
+    
     !> system coordinates
     integer  :: nat = 0
     integer,allocatable  :: opos(:)   !> mapping of each atom in the original (topmost) layer
@@ -71,6 +76,10 @@ module lwoniom_structures
     real(wp),allocatable :: linkxyz(:,:)  !> Cartesian coordinates, in Bohr
     real(wp),allocatable :: linkgrd_high(:,:)  !> similar to grd, but for link atoms
     real(wp),allocatable :: linkgrd_low(:,:)  !> similar to grd, but for link atoms
+
+    !> Additional user-defined information for the subsystem
+    integer,allocatable :: chrg
+    integer,allocatable :: uhf
 
     !> embedding information (TODO, for the future)
     integer :: npoint = 0
@@ -433,6 +442,9 @@ contains  !> MODULE PROCEDURES START HERE
     if (allocated(self%xyz)) deallocate (self%xyz)
     if (allocated(self%grd_high)) deallocate (self%grd_high)
     if (allocated(self%grd_low)) deallocate (self%grd_low)
+    if (allocated(self%Hss_high)) deallocate (self%Hss_high)
+    if (allocated(self%Hss_low)) deallocate (self%Hss_low)
+    if (allocated(self%Hss_qq)) deallocate (self%Hss_qq)
     if (allocated(self%Jaco)) deallocate (self%Jaco)
     self%nlink = 0
     if (allocated(self%linkat)) deallocate (self%linkat)

@@ -45,6 +45,7 @@ module lwoniom_parse
     real(wp),allocatable :: xyz(:,:)
     character(len=:),allocatable :: cmd(:)
     integer,allocatable :: layerlvl(:)
+    integer,allocatable :: fragmentchrg(:)
     integer,allocatable :: layerreplace(:,:)
     logical :: dump_frag = .false.
     logical :: dump_layer = .false.
@@ -57,6 +58,8 @@ module lwoniom_parse
 !> printout param
   character(len=*),parameter,private :: ns = 'lwONIOM> '
   character(len=*),parameter,private :: clears = '         '
+
+  logical,parameter :: debug = .false. 
 
 !========================================================================================!
 !========================================================================================!
@@ -282,6 +285,14 @@ contains  !> MODULE PROCEDURES START HERE
       call read_lwoniom_layerreplace(error,input,child)
     end if
 
+
+    !> read charges for fragments
+    call get_value(table,'chrg',child,requested=.false.)
+    if (associated(child)) then
+      call read_lwoniom_fragcharge(error,input,child)
+    end if
+
+    if(debug) stop
   end subroutine read_lwoniom_block
 
 !========================================================================================!
@@ -571,6 +582,48 @@ contains  !> MODULE PROCEDURES START HERE
     if (k < 1) deallocate (input%layerreplace)
 
   end subroutine read_lwoniom_layerreplace
+
+
+  subroutine read_lwoniom_fragcharge(error,input,table)
+!*******************************************************
+!* Read a charge for a given fragment
+!* the toml syntax will look like this:
+!* chrg.1 = 2   #to set charge of fragment 1 to 2
+!*******************************************************
+    !> Error handler
+    type(toml_error),allocatable :: error
+    !> Hamiltonian input to be read
+    type(lwoniom_input),intent(inout) :: input
+    !> Data structure
+    type(toml_table),intent(inout) :: table
+    type(toml_table),pointer :: child
+    type(toml_table) :: newtable
+    integer :: io,i,j,k,l,f,io2,io3,i1,i2
+    integer :: ikey,childikey
+    type(toml_key),allocatable :: list(:)
+    type(toml_key),allocatable :: childlist(:)
+    type(toml_array),pointer    :: arr
+    character(len=:),allocatable :: key
+    integer :: val
+    integer,allocatable :: lay(:)
+
+    !> iterate over keys (which should be integer numbers)
+    call table%get_keys(list)
+    do ikey = 1,size(list)
+      key = list(ikey)%key
+      read (key,*,iostat=io) l !> the key must be a number referring to a layer
+      if (io == 0.and.l <= input%maxfragments) then
+        call get_value(table,key,val,stat=io2) !> read the charge
+        if (io2 == 0) then
+          if(.not.allocated(input%fragmentchrg))then
+             allocate(input%fragmentchrg(input%maxfragments), source=-9990)
+          endif
+          input%fragmentchrg(l) = val
+          write (stdout,'(a,i0,a,i0)') ns//'setting charge of fragment ',l,' to ',val
+        endif
+      end if
+    end do
+  end subroutine read_lwoniom_fragcharge
 
 #endif
 !========================================================================================!

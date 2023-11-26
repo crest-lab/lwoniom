@@ -22,6 +22,7 @@ module lwoniom_interface
   use lwoniom_setup
   use lwoniom_structures,only:zsym_to_at
   use lwoniom_engrad
+  use lwoniom_hessian
   implicit none
   private
 
@@ -31,6 +32,7 @@ module lwoniom_interface
   public :: lwoniom_input,lwoniom_parse_inputfile
   public :: lwoniom_data,lwoniom_initialize
   public :: lwoniom_singlepoint
+  public :: lwoniom_gethess
 
 !> interface routines
   public :: lwoniom_new_calculator
@@ -143,6 +145,18 @@ contains  !> MODULE PROCEDURES START HERE
         end do
       end if
 
+      !> fragment specific charges
+      if(allocated(inp%fragmentchrg))then
+        do j = 1,dat%nfrag
+          if(inp%fragmentchrg(j) /= -9990 )then
+            if(.not.allocated(dat%fragment(j)%chrg))then
+             allocate(dat%fragment(j)%chrg)
+            endif
+            dat%fragment(j)%chrg = inp%fragmentchrg(j)
+          endif
+        enddo
+      endif
+
       inquire (file='lwoniom.data',exist=ex)
       if (inp%try_bin) then
         if (.not.ex) then
@@ -150,7 +164,7 @@ contains  !> MODULE PROCEDURES START HERE
           flush (stdout)
           call dat%dump_bin
         else
-          write (stdout,'("lwONIOM> ",a)') 'lwONIOM model file "lwoniom.data" already exists and will not be overwritten.'
+          write (stdout,'("lwONIOM> ",a)') 'lwONIOM model file "lwoniom.data" already exists and will NOT be overwritten.'
         end if
       end if
 

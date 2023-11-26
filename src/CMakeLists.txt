@@ -6,6 +6,7 @@ list(APPEND srcs
    "${dir}/lwoniom_structure.f90"
    "${dir}/lwoniom_covrad.f90"
    "${dir}/lwoniom_engrad.f90"
+   "${dir}/lwoniom_hessian.f90"
    "${dir}/lwoniom_setup.f90"
    "${dir}/lwoniom_interface.f90"
 )
