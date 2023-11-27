@@ -22,11 +22,14 @@ module lwoniom_hessian
 !************************************************************
   use iso_fortran_env,only:wp => real64,stdout => output_unit
   use lwoniom_setup
+  use lwoniom_structures
   implicit none
   private
 
 !> routines/datatypes that can be seen outside the module
-  public :: lwoniom_gethess
+  public :: lwoniom_gethess,lwonion_placehess
+
+  logical,parameter :: debug = .false. 
 
 !========================================================================================!
 !========================================================================================!
@@ -107,7 +110,7 @@ contains  !> MODULE PROCEDURES START HERE
     n3 = 3*nat
     hdim = n3*(n3+1)/2
 
-    !write(*,*) 'Constructing ONIOM Hessian for fragment',F
+    if(debug) write(*,*) 'Constructing ONIOM Hessian for fragment',F
     if (.not.allocated(dat%fragment(F)%Hss_qq)) then
       allocate (dat%fragment(F)%Hss_qq(hdim))
     end if
@@ -129,7 +132,7 @@ contains  !> MODULE PROCEDURES START HERE
         !==============================================!
 
         dat%fragment(F)%Hss_qq(:) = dat%fragment(F)%Hss_qq(:) + &
-        & dat%fragment(KK)%Hss_qq(:) - dat%fragment(kk)%Hss_low(:)
+        & dat%fragment(KK)%Hss_qq(:)-dat%fragment(kk)%Hss_low(:)
 
       end do
     else
@@ -151,13 +154,94 @@ contains  !> MODULE PROCEDURES START HERE
     k = 1
     do j = 1,n
       do i = 1,j
-        matrix(i,j) = matrix(i,j) + packed_matrix(k)
-        matrix(j,i) = matrix(i,j) + packed_matrix(k)  !> lower triangle
+        matrix(i,j) = matrix(i,j)+packed_matrix(k)
+        matrix(j,i) = matrix(i,j)!+packed_matrix(k)  !> lower triangle
         k = k+1
       end do
     end do
   end subroutine unpack_symmetric_matrix
 
+!========================================================================================!
+
+  subroutine pack_symmetric_matrix(packed_matrix,matrix,n,ulo)
+    implicit none
+    integer,intent(in) :: n
+    real(wp),intent(out) :: packed_matrix((n*(n+1))/2)
+    real(wp),intent(in) :: matrix(n,n)
+    character(len=1),intent(in),optional :: ulo
+    integer :: i,j,k
+    logical :: uplo
+    k = 1
+    if (present(ulo)) then
+      select case (ulo)
+      case ('u','U'); uplo = .true.
+      case ('l','L'); uplo = .false.
+      end select
+    else
+      uplo = .true.
+    end if
+    do j = 1,n
+      do i = 1,j
+        if (uplo) then
+          packed_matrix(k) = matrix(i,j) !> upper triangle
+        else
+          packed_matrix(k) = matrix(j,i) !> lower triangle
+        end if
+        k = k+1
+      end do
+    end do
+  end subroutine pack_symmetric_matrix
+
+!========================================================================================!
+
+  subroutine lwonion_placehess(dat,truenat,nat,hess,F,highlow)
+    implicit none
+    !> INPUT
+    type(lwoniom_data),intent(inout) :: dat
+    integer,intent(in) :: truenat,nat
+    real(wp),intent(in) :: hess(nat*3,nat*3)
+    integer,intent(in) :: F,highlow
+    !> LOCAL
+    real(wp),allocatable :: JacoT(:,:)
+    real(wp),allocatable :: hesstmp(:,:)
+    integer :: i,j,k,l
+    integer :: fragnat,m,n,hdim,n3
+
+    m = nat
+    n = truenat
+    n3 = n*3
+    hdim = n3*(n3+1)/2
+    if (.not.allocated(dat%fragment(F)%Jaco)) then
+      call dat%fragment(F)%construct_jacobian(m,n)
+    end if
+    allocate (JacoT(n3,m*3),source=0.0_wp)
+    JacoT = transpose(dat%fragment(F)%Jaco)
+
+    allocate (hesstmp(n3,n3),source=0.0_wp)
+    hesstmp = matmul(matmul(JacoT,hess),dat%fragment(F)%Jaco)
+
+    select case (highlow)
+    case (1,3) !> high or root
+      if (.not.allocated(dat%fragment(F)%Hss_high)) then
+        allocate (dat%fragment(F)%Hss_high(hdim))
+      end if
+      call pack_symmetric_matrix( &
+      & dat%fragment(F)%Hss_high, &
+      & hesstmp,n3,'u')
+      !if(highlow == 1) dat%fragment(F)%Hss_high = 0.0_wp
+    case (2) !> low
+      if (.not.allocated(dat%fragment(F)%Hss_low)) then
+        allocate (dat%fragment(F)%Hss_low(hdim))
+      end if
+      call pack_symmetric_matrix( &
+      & dat%fragment(F)%Hss_low,  &
+      & hesstmp,n3,'u')
+      !if(highlow == 2) dat%fragment(F)%Hss_high = 0.0_wp
+    end select
+
+    deallocate (hesstmp)
+    deallocate (JacoT)
+  end subroutine lwonion_placehess
 !========================================================================================!
 !========================================================================================!
 end module lwoniom_hessian

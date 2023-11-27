@@ -32,7 +32,7 @@ module lwoniom_interface
   public :: lwoniom_input,lwoniom_parse_inputfile
   public :: lwoniom_data,lwoniom_initialize
   public :: lwoniom_singlepoint
-  public :: lwoniom_gethess
+  public :: lwoniom_gethess,lwonion_placehess 
 
 !> interface routines
   public :: lwoniom_new_calculator

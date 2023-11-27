@@ -99,6 +99,7 @@ module lwoniom_structures
     procedure :: update => update_fragment
     procedure :: dump_bin => lwoniom_structure_dump_bin
     procedure :: read_bin => lwoniom_structure_read_bin
+    procedure :: construct_jacobian
   end type structure_data
 !**************************************************************************!
 
@@ -183,7 +184,8 @@ contains  !> MODULE PROCEDURES START HERE
 
 !========================================================================================!
 
-  subroutine project_gradient(self,fragnat,fraggrd,truenat,truegrd)
+
+  subroutine construct_jacobian(self,fragnat,truenat)
 !*********************************************************************
 !* The Jacobian is a 3m x 3n matrix ( Jaco(3*m,3*n) ), where
 !* m = nat+nlink of the fragment and
@@ -200,16 +202,11 @@ contains  !> MODULE PROCEDURES START HERE
 !* Since k is constant in this implementation (determined from covalent rad)
 !* the corresponding J elements are easy. If k is calculated dynamically,
 !* additional derivatives would be introduced.
-!*
-!* The gradient of the model system g' can then be projected into the
-!* basis of the real system  g = g'J
 !*********************************************************************
     implicit none
     class(structure_data) :: self
     integer,intent(in) :: fragnat
-    real(wp),intent(in) :: fraggrd(3,fragnat)
     integer,intent(in) :: truenat
-    real(wp),intent(out) :: truegrd(3,truenat)
 !&<
     real(wp),parameter :: E(3, 3) = reshape( &
                 & [ 1.0_wp, 0.0_wp, 0.0_wp,  &
@@ -223,16 +220,11 @@ contains  !> MODULE PROCEDURES START HERE
     integer :: m,n,i,j,l,k,i2,i3,i4,ii4
 
 !>--- reset
-    truegrd = 0.d0
     self%truenat = truenat
 
 !>--- allocate J and g'
     m = fragnat != self%nat+self%nlink
     n = truenat
-    allocate (g(3*m),source=0.0_wp)
-    !g = reshape([self%grd,self%linkgrd], [3*m])
-    g = reshape(fraggrd, [3*m])
-
     if (.not.allocated(self%Jaco)) then
       allocate (Jaco(3*m,3*n),source=0.0_wp)
 !>--- Set up the Jacobian
@@ -270,6 +262,50 @@ contains  !> MODULE PROCEDURES START HERE
 !>--- this may only be done if the Jacobian is static
       call move_alloc(Jaco,self%Jaco)
     end if
+  end subroutine construct_jacobian
+
+!========================================================================================!
+
+  subroutine project_gradient(self,fragnat,fraggrd,truenat,truegrd)
+!*********************************************************************
+!* The Jacobian is a 3m x 3n matrix ( Jaco(3*m,3*n) ), where
+!* m = nat+nlink of the fragment and
+!* n = nat of the full system
+!*
+!* The gradient of the model system g' can then be projected into the
+!* basis of the real system  g = g'J
+!*********************************************************************
+    implicit none
+    class(structure_data) :: self
+    integer,intent(in) :: fragnat
+    real(wp),intent(in) :: fraggrd(3,fragnat)
+    integer,intent(in) :: truenat
+    real(wp),intent(out) :: truegrd(3,truenat)
+!&<
+    real(wp),parameter :: E(3, 3) = reshape( &
+                & [ 1.0_wp, 0.0_wp, 0.0_wp,  &
+                &   0.0_wp, 1.0_wp, 0.0_wp,  &
+                &   0.0_wp, 0.0_wp, 1.0_wp], &
+                & shape(E))
+!&>
+    real(wp),allocatable :: Jaco(:,:)
+    real(wp) :: Jij(3,3),x
+    real(wp),allocatable :: g(:)
+    integer :: m,n,i,j,l,k,i2,i3,i4,ii4
+
+!>--- reset
+    truegrd = 0.d0
+    self%truenat = truenat
+
+!>--- allocate J and g'
+    m = fragnat != self%nat+self%nlink
+    n = truenat
+    allocate (g(3*m),source=0.0_wp)
+    g = reshape(fraggrd, [3*m])
+
+    if (.not.allocated(self%Jaco)) then
+       call self%construct_jacobian(m,n)
+    end if
 
 !>--- calculate g = g'J  and save to self%gradient
     truegrd(:,:) = reshape(matmul(g,self%Jaco), [3,truenat])
@@ -296,37 +332,21 @@ contains  !> MODULE PROCEDURES START HERE
 
     if (fragnat <= truenat) then
       if (allocated(self%grd_high)) then
-        !> combine atoms and linkatoms into a single gradient
-        !allocate (g_high(3,fragnat),source=0.0d0)
-        !g_high(:,1:self%nat) = self%grd_high(:,:)
-        !g_high(:,self%nat+1:) = self%linkgrd_high(:,:)
-
         !> allocate and call project_gradient for high level
         if (.not.allocated(self%gradient_high)) allocate (self%gradient_high(3,truenat))
-        !call project_gradient(self,fragnat,g_high,truenat,self%gradient_high)
         call project_gradient(self,fragnat, &
         &  reshape([self%grd_high,self%linkgrd_high], [3,fragnat]), &
         &  truenat,self%gradient_high)
       end if
 
       if (allocated(self%grd_low)) then
-        !> combine atoms and linkatoms into a single gradient
-        !> for both high and low levels
-        !allocate (g_low(3,fragnat),source=0.0d0)
-        !g_low(:,1:self%nat) = self%grd_low(:,:)
-        !g_low(:,self%nat+1:) = self%linkgrd_low(:,:)
-
         !> allocate and call project_gradient for low level
         if (.not.allocated(self%gradient_low)) allocate (self%gradient_low(3,truenat))
-        !call project_gradient(self,fragnat,g_low,truenat,self%gradient_low)
         call project_gradient(self,fragnat, &
         &  reshape([self%grd_low,self%linkgrd_low], [3,fragnat]), &
         &  truenat,self%gradient_low)
       end if
     end if
-
-    !if(allocated(g_high))deallocate (g_high)
-    !if(allocated(g_low)) deallocate (g_low)
   end subroutine project_gradient_highlow
 
 !========================================================================================!
