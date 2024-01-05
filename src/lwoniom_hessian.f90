@@ -164,6 +164,11 @@ contains  !> MODULE PROCEDURES START HERE
 !========================================================================================!
 
   subroutine pack_symmetric_matrix(packed_matrix,matrix,n,ulo)
+!**************************************
+!* Pack a symmetric matrix and only
+!* store the upper or lower triangular 
+!* form as a 1-d array
+!**************************************
     implicit none
     integer,intent(in) :: n
     real(wp),intent(out) :: packed_matrix((n*(n+1))/2)
@@ -195,6 +200,11 @@ contains  !> MODULE PROCEDURES START HERE
 !========================================================================================!
 
   subroutine lwonion_placehess(dat,truenat,nat,hess,F,highlow)
+!****************************************************
+!* Place a Hessian for a fragment with nat atoms
+!* into fragment F of dat. highlow specfies if the
+!* Hessian corresponds to the high or low level of F
+!****************************************************
     implicit none
     !> INPUT
     type(lwoniom_data),intent(inout) :: dat
@@ -242,6 +252,7 @@ contains  !> MODULE PROCEDURES START HERE
     deallocate (hesstmp)
     deallocate (JacoT)
   end subroutine lwonion_placehess
+
 !========================================================================================!
 !========================================================================================!
 end module lwoniom_hessian

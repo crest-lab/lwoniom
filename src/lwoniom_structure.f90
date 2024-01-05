@@ -20,7 +20,7 @@
 module lwoniom_structures
 !**************************************************************
 !* This module implements the structure_data type.
-!* Each structure_data tracks coordinate and layer informatio
+!* Each structure_data tracks coordinate and layer information
 !**************************************************************
   use iso_fortran_env,only:wp => real64,stdout => output_unit,stderr => error_unit
   implicit none

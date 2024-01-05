@@ -131,7 +131,6 @@ contains  !> MODULE PROCEDURES START HERE
               do ii = 1,size(inp%layerreplace,1)
                 kk = inp%layerreplace(ii,i)
                 if (kk > 0) then
-                  !write(*,*) '#####',j,ii,'-->',kk
                   do jj = 1,dat%fragment(j)%nat
                     if (dat%fragment(j)%at(jj) == ii) then
                       dat%fragment(j)%at(jj) = kk
@@ -139,7 +138,6 @@ contains  !> MODULE PROCEDURES START HERE
                   end do
                 end if
               end do
-              !write(*,*) dat%fragment(j)%at
             end if
           end do
         end do

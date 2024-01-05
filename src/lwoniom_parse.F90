@@ -16,7 +16,12 @@
 ! You should have received a copy of the GNU Lesser General Public License
 ! along with lwoniom. If not, see <https://www.gnu.org/licenses/>.
 !================================================================================!
+
 module lwoniom_parse
+!********************************************
+!* This module implements the toml-f parser
+!* to provide an input parser for lwONIOM
+!********************************************
   use iso_fortran_env,only:wp => real64,stdout => output_unit,stderr => error_unit
 #ifdef WITH_TOMLF
   use tomlf
